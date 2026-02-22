@@ -1,0 +1,6 @@
+.*
+*.lock
+build
+dist
+!.gitignore
+!.yarnrc.yml
