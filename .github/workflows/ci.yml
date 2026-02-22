@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, Types, Build, E2E
+    runs-on: ubuntu-latest
+    env:
+      YARN_NODE_LINKER: node-modules
+      YARN_ENABLE_GLOBAL_CACHE: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.4 --activate
+          node --version
+          corepack yarn --version
+
+      - name: Install dependencies
+        run: corepack yarn install --immutable
+
+      - name: Lint
+        run: corepack yarn lint
+
+      - name: Check types (frontend)
+        run: corepack yarn workspace frontend check-types
+
+      - name: Check types (bot)
+        run: corepack yarn workspace bot check-types
+
+      - name: Build backend
+        run: corepack yarn workspace backend build
+
+      - name: Build frontend
+        run: corepack yarn workspace frontend build
+
+      - name: Run backend e2e tests
+        run: corepack yarn workspace backend test:e2e

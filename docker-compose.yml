@@ -1,0 +1,76 @@
+name: miniapp
+
+services:
+  postgres:
+    profiles: ["infra"]
+    image: postgres:16-alpine
+    container_name: ${POSTGRES_CONTAINER_NAME:-telegram-miniapp-postgres}
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    profiles: ["infra"]
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: [ "sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\"" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./apps/backend/.env
+    environment:
+      PORT: ${BACKEND_PORT:-3000}
+    ports:
+      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+    command:
+      - sh
+      - -c
+      - ./node_modules/.bin/prisma migrate deploy --config ./apps/backend/prisma.config.ts && node apps/backend/dist-ncc/index.js
+
+  bot:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./apps/bot/.env
+    environment:
+      BACKEND_HOST: backend
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
+      TELEGRAM_WEBHOOK_PORT: ${BOT_WEBHOOK_PORT:-3200}
+    ports:
+      - "${BOT_WEBHOOK_PORT:-3200}:${BOT_WEBHOOK_PORT:-3200}"
+
+volumes:
+  postgres_data:
+  redis_data:
