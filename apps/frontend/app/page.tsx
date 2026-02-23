@@ -336,6 +336,7 @@ export default function Home() {
         <nav className={styles.navLinks}>
           <Link href="/auth/register">Web: Register</Link>
           <Link href="/auth/login">Web: Login</Link>
+          <Link href="/auth/google">Web: Google</Link>
         </nav>
       </main>
     </div>

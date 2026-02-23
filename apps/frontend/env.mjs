@@ -40,6 +40,7 @@ export function loadFrontendEnv(rawEnv = process.env) {
     ),
     NEXT_PUBLIC_API_MODE: nextPublicApiMode,
     NEXT_PUBLIC_DIRECT_API_BASE_URL: nextPublicDirectApiBaseUrl,
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: parseOptionalString(rawEnv.NEXT_PUBLIC_GOOGLE_CLIENT_ID),
     BACKEND_API_BASE_URL: parseAbsoluteUrl(rawEnv.BACKEND_API_BASE_URL, 'BACKEND_API_BASE_URL', errors),
   }
 
@@ -88,4 +89,9 @@ function parseEnum(rawValue, variableName, allowed, fallback, errors) {
 
   errors.push(`${variableName} must be one of [${allowed.join(', ')}], got "${rawValue}"`)
   return fallback
+}
+
+function parseOptionalString(rawValue) {
+  const value = rawValue?.trim()
+  return value ? value : undefined
 }

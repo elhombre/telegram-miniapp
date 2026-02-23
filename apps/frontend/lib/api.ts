@@ -3,6 +3,7 @@ type ApiMode = 'proxy' | 'direct'
 const TELEGRAM_VERIFY_INIT_DATA_PATH = 'telegram/verify-init-data'
 const EMAIL_REGISTER_PATH = 'email/register'
 const EMAIL_LOGIN_PATH = 'email/login'
+const GOOGLE_CALLBACK_PATH = 'google/callback'
 const REFRESH_SESSION_PATH = 'refresh'
 const LOGOUT_PATH = 'logout'
 
@@ -16,6 +17,10 @@ export function getEmailRegisterEndpoint(): string {
 
 export function getEmailLoginEndpoint(): string {
   return getAuthEndpoint(EMAIL_LOGIN_PATH)
+}
+
+export function getGoogleCallbackEndpoint(): string {
+  return getAuthEndpoint(GOOGLE_CALLBACK_PATH)
 }
 
 export function getRefreshSessionEndpoint(): string {

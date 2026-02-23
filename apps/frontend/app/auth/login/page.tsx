@@ -136,6 +136,7 @@ export default function LoginPage() {
 
         <nav className={styles.links}>
           <Link href="/auth/register">Create account</Link>
+          <Link href="/auth/google">Google sign-in</Link>
           <Link href="/">Open mini app screen</Link>
         </nav>
       </main>

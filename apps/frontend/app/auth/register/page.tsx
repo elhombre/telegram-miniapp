@@ -159,6 +159,7 @@ export default function RegisterPage() {
 
         <nav className={styles.links}>
           <Link href="/auth/login">Go to login</Link>
+          <Link href="/auth/google">Google sign-in</Link>
           <Link href="/">Open mini app screen</Link>
         </nav>
       </main>

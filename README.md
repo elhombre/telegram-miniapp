@@ -155,9 +155,9 @@ Steps:
 
 If needed, paste raw payload into `Manual Re-Run` and press `Authorize Again`.
 
-## Web Email Auth Smoke Test
+## Web Auth Smoke Test
 
-Goal: verify standalone web frontend can register/login via backend and store session.
+Goal: verify standalone web frontend can register/login with email and authenticate via Google.
 
 Preconditions:
 
@@ -166,6 +166,27 @@ Preconditions:
 3. `apps/frontend/.env` has valid API mode setup:
    - recommended local: `NEXT_PUBLIC_API_MODE=proxy`
    - `BACKEND_API_BASE_URL=http://localhost:3000/api/v1`
+4. For Google flow:
+   - `apps/backend/.env` has `GOOGLE_CLIENT_ID=<your-google-oauth-client-id>`
+   - `apps/frontend/.env` has `NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same-client-id>`
+
+How to get `GOOGLE_CLIENT_ID`:
+
+1. Open Google Cloud Console and select/create project.
+2. Configure OAuth consent screen (app name, user support email, and test users if app is in testing mode).
+3. Go to Credentials -> Create Credentials -> OAuth client ID.
+4. Choose application type `Web application`.
+5. Add `Authorized JavaScript origins`:
+   - `http://localhost:3100`
+   - your public frontend URL (for example ngrok/Vercel domain), if you test outside localhost
+6. Copy generated Client ID and use the same value in:
+   - `apps/backend/.env` -> `GOOGLE_CLIENT_ID`
+   - `apps/frontend/.env` -> `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+
+Important:
+
+- For current ID-token callback flow, Client Secret is not used on frontend.
+- Backend and frontend must use the same Client ID, otherwise backend returns `INVALID_GOOGLE_TOKEN`.
 
 Steps:
 
@@ -174,6 +195,8 @@ Steps:
 3. Confirm success message and session card.
 4. Open `http://localhost:3100/auth/login`.
 5. Sign in with same credentials and confirm session card.
+6. Open `http://localhost:3100/auth/google`.
+7. Click Google sign-in button (or use manual idToken fallback) and confirm session card.
 
 Notes:
 
