@@ -428,7 +428,7 @@ export class AuthService {
     }
 
     if (dto.provider === LinkProviderDto.telegram && dto.initDataRaw?.trim()) {
-      const telegramUser = this.verifyTelegramInitData(dto.initDataRaw)
+      const telegramUser = this.verifyTelegramLinkAuthData(dto.initDataRaw)
       verifiedProviderUserId = String(telegramUser.id)
       providerMetadata = {
         username: telegramUser.username,
@@ -680,6 +680,20 @@ export class AuthService {
     }
   }
 
+  private verifyTelegramLinkAuthData(initDataRaw: string): TelegramUser {
+    const params = new URLSearchParams(initDataRaw)
+
+    if (params.get('user')) {
+      return this.verifyTelegramInitData(initDataRaw)
+    }
+
+    if (params.get('id')) {
+      return this.verifyTelegramLoginWidgetData(initDataRaw)
+    }
+
+    return this.verifyTelegramInitData(initDataRaw)
+  }
+
   private verifyTelegramInitData(initDataRaw: string): TelegramUser {
     if (!this.env.TELEGRAM_BOT_TOKEN) {
       throw new ServiceUnavailableException({
@@ -764,5 +778,81 @@ export class AuthService {
     }
 
     return telegramUser
+  }
+
+  private verifyTelegramLoginWidgetData(initDataRaw: string): TelegramUser {
+    if (!this.env.TELEGRAM_BOT_TOKEN) {
+      throw new ServiceUnavailableException({
+        code: 'TELEGRAM_AUTH_DISABLED',
+        message: 'Telegram auth is not configured',
+      })
+    }
+
+    const params = new URLSearchParams(initDataRaw)
+    const providedHash = params.get('hash')
+
+    if (!providedHash || !/^[a-f0-9]{64}$/i.test(providedHash)) {
+      throw new UnauthorizedException({
+        code: 'INVALID_TELEGRAM_INIT_DATA',
+        message: 'Telegram auth hash is missing or invalid',
+      })
+    }
+
+    const authDateRaw = params.get('auth_date')
+    const authDate = authDateRaw ? Number.parseInt(authDateRaw, 10) : Number.NaN
+
+    if (!Number.isInteger(authDate) || authDate <= 0) {
+      throw new UnauthorizedException({
+        code: 'INVALID_TELEGRAM_INIT_DATA',
+        message: 'Telegram auth_date is invalid',
+      })
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    if (nowSeconds - authDate > this.env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS) {
+      throw new UnauthorizedException({
+        code: 'TELEGRAM_INIT_DATA_EXPIRED',
+        message: 'Telegram auth data is expired',
+      })
+    }
+
+    const dataCheckString = [...params.entries()]
+      .filter(([key]) => key !== 'hash')
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, value]) => `${key}=${value}`)
+      .join('\n')
+
+    const secretKey = createHash('sha256').update(this.env.TELEGRAM_BOT_TOKEN).digest()
+    const expectedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex')
+
+    const expectedHashBuffer = Buffer.from(expectedHash, 'hex')
+    const providedHashBuffer = Buffer.from(providedHash, 'hex')
+
+    if (
+      expectedHashBuffer.length !== providedHashBuffer.length ||
+      !timingSafeEqual(expectedHashBuffer, providedHashBuffer)
+    ) {
+      throw new UnauthorizedException({
+        code: 'INVALID_TELEGRAM_SIGNATURE',
+        message: 'Telegram auth signature is invalid',
+      })
+    }
+
+    const idRaw = params.get('id')
+    const id = idRaw ? Number.parseInt(idRaw, 10) : Number.NaN
+
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new UnauthorizedException({
+        code: 'INVALID_TELEGRAM_INIT_DATA',
+        message: 'Telegram user id is missing',
+      })
+    }
+
+    return {
+      id,
+      username: params.get('username') ?? undefined,
+      first_name: params.get('first_name') ?? undefined,
+      last_name: params.get('last_name') ?? undefined,
+    }
   }
 }

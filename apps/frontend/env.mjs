@@ -41,6 +41,10 @@ export function loadFrontendEnv(rawEnv = process.env) {
     NEXT_PUBLIC_API_MODE: nextPublicApiMode,
     NEXT_PUBLIC_DIRECT_API_BASE_URL: nextPublicDirectApiBaseUrl,
     NEXT_PUBLIC_GOOGLE_CLIENT_ID: parseOptionalString(rawEnv.NEXT_PUBLIC_GOOGLE_CLIENT_ID),
+    NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME: parseOptionalTelegramBotPublicName(
+      rawEnv.NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME,
+      errors,
+    ),
     BACKEND_API_BASE_URL: parseAbsoluteUrl(rawEnv.BACKEND_API_BASE_URL, 'BACKEND_API_BASE_URL', errors),
   }
 
@@ -94,4 +98,23 @@ function parseEnum(rawValue, variableName, allowed, fallback, errors) {
 function parseOptionalString(rawValue) {
   const value = rawValue?.trim()
   return value ? value : undefined
+}
+
+function parseOptionalTelegramBotPublicName(rawValue, errors) {
+  const value = parseOptionalString(rawValue)
+  if (!value) {
+    return undefined
+  }
+
+  const normalizedValue = value.replace(/^@/, '')
+  const isValidHandle = /^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(normalizedValue)
+
+  if (!isValidHandle) {
+    errors.push(
+      `NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME must be a Telegram bot handle (from t.me/<handle>) without "@", got "${rawValue}"`,
+    )
+    return undefined
+  }
+
+  return normalizedValue
 }

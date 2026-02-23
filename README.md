@@ -169,6 +169,9 @@ Preconditions:
 4. For Google flow:
    - `apps/backend/.env` has `GOOGLE_CLIENT_ID=<your-google-oauth-client-id>`
    - `apps/frontend/.env` has `NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same-client-id>`
+5. For Telegram linking from browser:
+   - `apps/frontend/.env` has `NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME=<your_bot_public_name_without_@>` (example: if bot link is `https://t.me/MyDemoBot`, use `MyDemoBot`)
+   - in BotFather run `/setdomain` and set the exact frontend domain where linking page is opened (for ngrok, update after each new tunnel domain)
 
 How to get `GOOGLE_CLIENT_ID`:
 
@@ -204,7 +207,7 @@ Steps:
      - signed in with `email`: `google`, `telegram`
    - `google`: click Google sign-in button inside linking section (linking starts automatically)
    - `email`: fill email + password and click `Link Provider`
-   - `telegram`: shown as pending for browser flow (planned via Telegram Login Widget)
+   - `telegram`: click Telegram Login Widget button inside linking section
 
 Notes:
 
@@ -228,6 +231,7 @@ Use BotFather in Telegram.
 Optional hardening:
 
 - If token leaked, run `/revoke` in BotFather and update env.
+- For Telegram Login Widget (browser linking), run `/setdomain` in BotFather and set your frontend domain (`example.com`, no path).
 
 ### 2. Configure Mini App URL
 
@@ -372,6 +376,9 @@ yarn workspace bot dev:webhook
   - Ensure webhook is deleted (`deleteWebhook`).
 - Telegram cannot open Mini App.
   - Check `TELEGRAM_MINIAPP_URL` is public HTTPS.
+- Telegram linking shows `Bot domain invalid`.
+  - Run `/setdomain` in BotFather for the same bot and set the exact frontend domain where the widget is opened.
+  - For ngrok/cloudflared temporary URLs, repeat `/setdomain` whenever the domain changes.
 - Telegram auth endpoint returns signature/authorization error.
   - Ensure `apps/backend/.env:TELEGRAM_BOT_TOKEN` matches `apps/bot/.env:TELEGRAM_BOT_TOKEN`.
 - Webhook returns unauthorized.

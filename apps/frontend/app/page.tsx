@@ -25,6 +25,11 @@ import {
   readStoredSession,
 } from '../lib/auth-client'
 import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '../lib/google-identity'
+import {
+  buildTelegramLoginWidgetAuthDataRaw,
+  renderTelegramLoginWidget,
+  TELEGRAM_BOT_PUBLIC_NAME,
+} from '../lib/telegram-login-widget'
 import { applyTelegramTheme, getTelegramWebApp, type TelegramWebAppUser } from '../lib/telegram'
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error'
@@ -56,9 +61,11 @@ export default function Home() {
   const [linkPassword, setLinkPassword] = useState('')
   const [linkStatus, setLinkStatus] = useState<LinkActionStatus>('idle')
   const [googleLinkButtonReady, setGoogleLinkButtonReady] = useState(false)
+  const [telegramLinkButtonReady, setTelegramLinkButtonReady] = useState(false)
   const [linkMessage, setLinkMessage] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
   const googleLinkButtonRef = useRef<HTMLDivElement | null>(null)
+  const telegramLinkButtonRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const storedSession = readStoredSession()
@@ -224,7 +231,7 @@ export default function Home() {
     }
   }, [linkToken, linkTokenExpiresAt])
 
-  const confirmLink = useCallback(async (options?: { googleIdToken?: string }) => {
+  const confirmLink = useCallback(async (options?: { googleIdToken?: string; telegramAuthDataRaw?: string }) => {
     const accessToken = authResponse?.accessToken ?? readStoredAccessToken()
     if (!accessToken) {
       setLinkStatus('error')
@@ -281,14 +288,16 @@ export default function Home() {
 
       payload.idToken = googleIdToken
     } else {
-      if (!initDataRaw.trim()) {
+      const telegramAuthDataRaw = isInTelegram ? initDataRaw.trim() : options?.telegramAuthDataRaw?.trim()
+
+      if (!telegramAuthDataRaw) {
         setLinkStatus('error')
-        setLinkError('Telegram linking from web browser is not implemented yet')
+        setLinkError('Use Telegram button to authorize provider linking')
         setLinkMessage(null)
         return
       }
 
-      payload.initDataRaw = initDataRaw.trim()
+      payload.initDataRaw = telegramAuthDataRaw
     }
 
     setLinkStatus('loading')
@@ -317,7 +326,7 @@ export default function Home() {
       setLinkError(message)
       setLinkMessage(null)
     }
-  }, [authResponse, ensureLinkToken, initDataRaw, linkEmail, linkPassword, linkProvider])
+  }, [authResponse, ensureLinkToken, initDataRaw, isInTelegram, linkEmail, linkPassword, linkProvider])
 
   useEffect(() => {
     if (linkProvider !== 'google') {
@@ -365,6 +374,50 @@ export default function Home() {
       isCancelled = true
       if (googleLinkButtonRef.current) {
         googleLinkButtonRef.current.innerHTML = ''
+      }
+    }
+  }, [confirmLink, isInTelegram, linkProvider])
+
+  useEffect(() => {
+    if (linkProvider !== 'telegram') {
+      setTelegramLinkButtonReady(false)
+      return
+    }
+
+    if (isInTelegram) {
+      setTelegramLinkButtonReady(false)
+      return
+    }
+
+    if (!TELEGRAM_BOT_PUBLIC_NAME) {
+      setTelegramLinkButtonReady(false)
+      return
+    }
+
+    if (!telegramLinkButtonRef.current) {
+      setTelegramLinkButtonReady(false)
+      return
+    }
+
+    let cleanup: (() => void) | undefined
+    try {
+      cleanup = renderTelegramLoginWidget(telegramLinkButtonRef.current, user => {
+        const authDataRaw = buildTelegramLoginWidgetAuthDataRaw(user)
+        void confirmLink({ telegramAuthDataRaw: authDataRaw })
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setLinkError(message)
+      setTelegramLinkButtonReady(false)
+      return
+    }
+
+    setTelegramLinkButtonReady(true)
+
+    return () => {
+      cleanup?.()
+      if (telegramLinkButtonRef.current) {
+        telegramLinkButtonRef.current.innerHTML = ''
       }
     }
   }, [confirmLink, isInTelegram, linkProvider])
@@ -650,8 +703,16 @@ export default function Home() {
               {linkProvider === 'telegram' ? (
                 <div className={styles.fieldLabel}>
                   <span>Telegram Account</span>
+                  <div ref={telegramLinkButtonRef} className={styles.googleButtonSlot} />
+                  {!TELEGRAM_BOT_PUBLIC_NAME ? (
+                    <span className={styles.error}>Set `NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME` in `apps/frontend/.env`.</span>
+                  ) : null}
+                  {TELEGRAM_BOT_PUBLIC_NAME && !telegramLinkButtonReady ? (
+                    <span className={styles.subtitle}>Telegram button is loading...</span>
+                  ) : null}
                   <span className={styles.subtitle}>
-                    Telegram linking from web browser is not implemented yet. Planned via Telegram Login Widget.
+                    If Telegram shows <code>Bot domain invalid</code>, run <code>/setdomain</code> in BotFather for this
+                    frontend domain.
                   </span>
                 </div>
               ) : null}
@@ -674,7 +735,7 @@ export default function Home() {
               ) : null}
               {linkProvider === 'telegram' ? (
                 <button className={styles.secondary} type="button" disabled>
-                  Telegram Linking Pending
+                  Use Telegram Button Above
                 </button>
               ) : null}
 
