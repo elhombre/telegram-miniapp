@@ -22,6 +22,7 @@ export interface AppEnv {
   EMAIL_FROM_EMAIL?: string
   EMAIL_FROM_NAME: string
   MAILERLITE_TOKEN?: string
+  NOTES_MAX_LENGTH: number
   RATE_LIMIT_ENABLED: boolean
   REDIS_URL?: string
 }
@@ -78,6 +79,7 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
     EMAIL_FROM_EMAIL: parseOptionalEmail(rawEnv.EMAIL_FROM_EMAIL, 'EMAIL_FROM_EMAIL', errors),
     EMAIL_FROM_NAME: parseNonEmptyString(rawEnv.EMAIL_FROM_NAME, 'EMAIL_FROM_NAME', 'Telegram Miniapp', errors),
     MAILERLITE_TOKEN: mailerLiteToken,
+    NOTES_MAX_LENGTH: parsePositiveInt(rawEnv.NOTES_MAX_LENGTH, 'NOTES_MAX_LENGTH', 2000, errors),
     RATE_LIMIT_ENABLED: parseBoolean(rawEnv.RATE_LIMIT_ENABLED, 'RATE_LIMIT_ENABLED', true, errors),
     REDIS_URL: redisUrl,
   }

@@ -10,6 +10,7 @@ const LINK_START_PATH = 'link/start'
 const LINK_CONFIRM_PATH = 'link/confirm'
 const LINK_EMAIL_REQUEST_PATH = 'link/email/request'
 const LINK_EMAIL_CONFIRM_PATH = 'link/email/confirm'
+const NOTES_PATH = 'notes'
 
 export function getTelegramVerifyInitDataEndpoint(): string {
   return getAuthEndpoint(TELEGRAM_VERIFY_INIT_DATA_PATH)
@@ -51,13 +52,30 @@ export function getLinkEmailConfirmEndpoint(): string {
   return getAuthEndpoint(LINK_EMAIL_CONFIRM_PATH)
 }
 
+export function getNotesEndpoint(): string {
+  return getApiEndpoint(NOTES_PATH)
+}
+
+export function getDeleteNoteEndpoint(noteId: string): string {
+  const normalizedNoteId = noteId.trim()
+  if (!normalizedNoteId) {
+    throw new Error('Note id is required')
+  }
+
+  return `${getNotesEndpoint()}/${encodeURIComponent(normalizedNoteId)}`
+}
+
 export function getCurrentApiMode(): ApiMode {
   return getApiMode()
 }
 
 function getAuthEndpoint(authPath: string): string {
-  if (!/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/i.test(authPath)) {
-    throw new Error(`Unsupported auth path: ${authPath}`)
+  return getApiEndpoint(`auth/${authPath}`)
+}
+
+function getApiEndpoint(apiPath: string): string {
+  if (!/^[a-z0-9-]+(?:\/[a-z0-9-]+)*$/i.test(apiPath)) {
+    throw new Error(`Unsupported API path: ${apiPath}`)
   }
 
   const apiMode = getApiMode()
@@ -66,10 +84,10 @@ function getAuthEndpoint(authPath: string): string {
     if (!directApiBaseUrl) {
       throw new Error('NEXT_PUBLIC_DIRECT_API_BASE_URL is required when NEXT_PUBLIC_API_MODE=direct')
     }
-    return `${directApiBaseUrl}/auth/${authPath}`
+    return `${directApiBaseUrl}/${apiPath}`
   }
 
-  return `/api/auth/${authPath}`
+  return `/api/${apiPath}`
 }
 
 function getApiMode(): ApiMode {

@@ -4,9 +4,10 @@ import { RequestIdMiddleware } from './common/http/request-id.middleware'
 import { PrismaModule } from './prisma/prisma.module'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
+import { NotesModule } from './notes/notes.module'
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, NotesModule],
   controllers: [AppController],
   providers: [AppService],
 })

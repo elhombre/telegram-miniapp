@@ -18,6 +18,7 @@
   "nav": {
     "welcome": "Welcome",
     "dashboard": "Dashboard",
+    "notes": "Notes",
     "linking": "Linked accounts",
     "login": "Sign in",
     "register": "Sign up",
@@ -54,6 +55,7 @@
     "subtitle": "Manage your profile, providers, and active session.",
     "telegramMenu": "Menu",
     "overview": "Overview",
+    "notes": "Notes",
     "linked": "Linked providers",
     "session": "Session",
     "needAuth": "You need to sign in first.",
@@ -63,6 +65,22 @@
     "provider": "Current provider",
     "email": "Email",
     "sessionReady": "Active session"
+  },
+  "notes": {
+    "title": "Notes",
+    "subtitle": "Store personal notes linked to your account.",
+    "createTitle": "Create note",
+    "maxLengthHint": "Maximum note length: {{maxLength}} characters.",
+    "noteLabel": "Note text",
+    "notePlaceholder": "Write your note here...",
+    "saving": "Saving...",
+    "add": "Add note",
+    "listTitle": "Your notes",
+    "listSubtitle": "Notes are stored in Postgres and available in web and mini app.",
+    "empty": "No notes yet.",
+    "createdAt": "Created",
+    "delete": "Delete",
+    "deleting": "Deleting..."
   },
   "linking": {
     "title": "Account linking",

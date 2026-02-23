@@ -32,6 +32,7 @@ model User {
   identities      Identity[]
   sessions        Session[]
   linkTokens      AccountLinkToken[]
+  notes           Note[]
 
   @@map("users")
 }
@@ -82,4 +83,16 @@ model AccountLinkToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("account_link_tokens")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notes")
 }

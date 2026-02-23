@@ -18,7 +18,7 @@ Production-first monorepo for Telegram Mini App + Web frontend + Backend API + T
 - `apps/bot`: Telegram bot runtime
 - `packages/ui`: shared UI package
 - `packages/typescript-config`: shared TS configs
-- `docker-compose.yml`: local Postgres
+- `docker-compose.yml`: local infrastructure (`postgres`, `redis`)
 
 ## Delivery Status
 
@@ -29,7 +29,7 @@ Production-first monorepo for Telegram Mini App + Web frontend + Backend API + T
 
 - Node.js 20+
 - Yarn 4+ (project uses `yarn@4.9.4`)
-- Docker Desktop (for local Postgres)
+- Docker Desktop (for local Postgres and Redis)
 - Telegram account for bot setup
 
 ## Initial Setup
@@ -52,9 +52,14 @@ cp apps/bot/.env.example apps/bot/.env
 
 3. Fill required secrets.
 
+- root `.env`
+  - `POSTGRES_*` values for local compose Postgres
+  - `REDIS_PORT`
+  - `REDIS_PASSWORD` (password for local compose Redis)
 - `apps/backend/.env`
   - `JWT_ACCESS_SECRET`
   - `JWT_REFRESH_SECRET`
+  - `NOTES_MAX_LENGTH` (optional, default `2000`)
   - optional email delivery settings:
     - `EMAIL_PROVIDER=mailerlite`
     - `MAILERLITE_TOKEN=<your_mailerlite_token>`
@@ -63,7 +68,7 @@ cp apps/bot/.env.example apps/bot/.env
   - optional distributed rate limiting:
     - `RATE_LIMIT_ENABLED=true`
     - `REDIS_URL=redis://<user>:<password>@<host>:<port>/<db>` (or `rediss://...`)
-    - Works with any Redis-compatible backend, including Upstash Redis endpoint and Aiven Valkey.
+    - Works with any Redis-compatible backend.
     - local docker-compose defaults:
       - root `.env`: `REDIS_PASSWORD=redis`
       - backend `.env`: `REDIS_URL=redis://:redis@localhost:6379/0`
@@ -229,6 +234,10 @@ Steps:
    - `google`: click Google button in linking section and select account (link request is sent automatically)
    - `email`: fill email, click `Send Verification Code`, then enter 6-digit code and click `Confirm Code & Link`
    - `telegram`: click Telegram Login Widget button inside linking section
+12. Open `http://localhost:3100/dashboard/notes` and verify notes flow:
+   - create a text note
+   - verify it appears in list with created date/time
+   - delete the note and verify it disappears from the list
 
 Notes:
 
@@ -240,12 +249,49 @@ Notes:
   - if `REDIS_URL` is configured, shared counters are stored in Redis
   - if Redis is unavailable (or `REDIS_URL` is empty), backend falls back to in-memory counters and logs warning
 
+## Rate Limiting Smoke Test
+
+Goal: verify auth rate limiting is active and counters are stored in Redis.
+
+Preconditions:
+
+1. `apps/backend/.env` has:
+   - `RATE_LIMIT_ENABLED=true`
+   - `REDIS_URL=redis://:redis@localhost:6379/0` (or your managed Redis URL)
+2. `docker compose up -d redis` is running from `code/`.
+3. Backend is running (`yarn workspace backend dev`).
+
+Steps:
+
+1. Send repeated failed email login attempts:
+
+```bash
+for i in 1 2 3 4 5 6 7; do
+  curl -s -o /dev/null -w "$i -> %{http_code}\n" \
+    -X POST http://127.0.0.1:3000/api/v1/auth/email/login \
+    -H 'content-type: application/json' \
+    -d '{"email":"ratetest@example.com","password":"WrongPass123"}'
+done
+```
+
+Expected:
+
+- first attempts return `401`
+- then responses switch to `429` when `email_login_ip_email` limit is exceeded
+
+2. Verify Redis key exists:
+
+```bash
+redis-cli -u "$REDIS_URL" --scan --pattern "rl:email_login_ip_email:*:ratetest@example.com"
+```
+
 ## UI Baseline
 
 - Welcome page is shared for Telegram Mini App and regular browser.
 - Header brand label is `Demo`; click it to navigate to `/`.
 - Browser mode uses dashboard sidebar navigation with toggle.
 - Telegram mode uses compact in-page menu for dashboard sections.
+- Notes section is available in both browser and Telegram Mini App modes.
 - UI stack is based on shadcn/ui components.
 - Theme switcher is a 3-state button: `light -> dark -> system -> light`.
 - i18n: `en` and `ru`, with locale JSON dictionaries.

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Link2, Menu, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Link2, Menu, NotebookText, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { AppShell } from '@/components/app/app-shell'
 import { Badge } from '@/components/ui/badge'
@@ -22,7 +22,7 @@ interface DashboardShellProps {
 }
 
 interface NavItem {
-  href: '/dashboard' | '/dashboard/linking'
+  href: '/dashboard' | '/dashboard/notes' | '/dashboard/linking'
   label: string
   icon: LucideIcon
 }
@@ -53,7 +53,10 @@ export function DashboardShell({ title, subtitle, children }: DashboardShellProp
   }, [])
 
   const navItems = useMemo<NavItem[]>(() => {
-    const items: NavItem[] = [{ href: '/dashboard', label: t('dashboard.overview'), icon: LayoutDashboard }]
+    const items: NavItem[] = [
+      { href: '/dashboard', label: t('dashboard.overview'), icon: LayoutDashboard },
+      { href: '/dashboard/notes', label: t('dashboard.notes'), icon: NotebookText },
+    ]
     if (isInTelegram === false) {
       items.push({ href: '/dashboard/linking', label: t('dashboard.linked'), icon: Link2 })
     }

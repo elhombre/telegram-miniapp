@@ -23,6 +23,7 @@ export function SiteHeader({ session, onLogout }: SiteHeaderProps) {
   const navItems = [
     { href: '/', label: t('nav.welcome') },
     { href: '/dashboard', label: t('nav.dashboard') },
+    { href: '/dashboard/notes', label: t('nav.notes') },
     ...(isInTelegram === false ? [{ href: '/dashboard/linking', label: t('nav.linking') }] : []),
   ]
 
