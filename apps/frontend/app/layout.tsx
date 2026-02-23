@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import Script from 'next/script'
+import { AppProviders } from './providers'
 import './globals.css'
 
 const geistSans = localFont({
@@ -23,10 +24,10 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" />
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   )

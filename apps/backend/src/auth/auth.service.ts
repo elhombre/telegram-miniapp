@@ -796,7 +796,7 @@ export class AuthService {
       return undefined
     }
 
-    const url = new URL('/', this.env.FRONTEND_ORIGIN)
+    const url = new URL('/dashboard/linking', this.env.FRONTEND_ORIGIN)
     url.searchParams.set('link_provider', 'email')
     url.searchParams.set('link_token', linkToken)
     url.searchParams.set('link_email', normalizedEmail)

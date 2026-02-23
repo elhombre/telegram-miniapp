@@ -24,13 +24,7 @@ export function loadFrontendEnv(rawEnv = process.env) {
   }
 
   const frontendEnv = {
-    NODE_ENV: parseEnum(
-      rawEnv.NODE_ENV,
-      'NODE_ENV',
-      NODE_ENV_VALUES,
-      'development',
-      errors,
-    ),
+    NODE_ENV: parseEnum(rawEnv.NODE_ENV, 'NODE_ENV', NODE_ENV_VALUES, 'development', errors),
     NEXT_PUBLIC_APP_ENV: parseEnum(
       rawEnv.NEXT_PUBLIC_APP_ENV,
       'NEXT_PUBLIC_APP_ENV',

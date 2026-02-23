@@ -6,11 +6,7 @@ interface ProxyAuthPostOptions {
   forwardAuthorizationHeader?: boolean
 }
 
-export async function proxyAuthPost(
-  request: Request,
-  authPath: string,
-  options: ProxyAuthPostOptions = {},
-) {
+export async function proxyAuthPost(request: Request, authPath: string, options: ProxyAuthPostOptions = {}) {
   const backendUrl = resolveBackendAuthUrl(authPath)
 
   if (!backendUrl) {

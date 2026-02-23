@@ -1,0 +1,100 @@
+{
+  "app": {
+    "name": "Miniapp Hub"
+  },
+  "language": {
+    "label": "Язык",
+    "en": "Английский",
+    "ru": "Русский"
+  },
+  "theme": {
+    "label": "Тема",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "system": "Системная"
+  },
+  "nav": {
+    "welcome": "Главная",
+    "dashboard": "Кабинет",
+    "linking": "Связанные аккаунты",
+    "login": "Вход",
+    "register": "Регистрация",
+    "google": "Google",
+    "logout": "Выйти"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "error": "Ошибка",
+    "success": "Успешно",
+    "email": "Email",
+    "password": "Пароль"
+  },
+  "welcome": {
+    "badge": "Telegram Mini App + Web",
+    "title": "Один аккаунт для Telegram и Web",
+    "subtitle": "Используйте единый профиль, связывайте провайдеры и управляйте сессиями в одном месте.",
+    "openDashboard": "Открыть кабинет",
+    "openLogin": "Войти",
+    "openRegister": "Создать аккаунт",
+    "inTelegram": "Вы открыли приложение в Telegram. Авторизация запускается автоматически.",
+    "bootstrapError": "Не удалось авторизоваться через Telegram. Попробуйте открыть mini app снова.",
+    "features": {
+      "title": "Что доступно",
+      "identity": "Единый аккаунт с явной привязкой провайдеров",
+      "security": "Поток подтверждения email кодом для линковки",
+      "ux": "Дружелюбный интерфейс для браузера и Telegram"
+    }
+  },
+  "dashboard": {
+    "title": "Кабинет пользователя",
+    "subtitle": "Управляйте профилем, провайдерами и активной сессией.",
+    "telegramMenu": "Меню",
+    "overview": "Обзор",
+    "linked": "Связанные провайдеры",
+    "session": "Сессия",
+    "needAuth": "Сначала нужно войти в аккаунт.",
+    "continueToLogin": "Перейти ко входу",
+    "userId": "ID пользователя",
+    "role": "Роль",
+    "provider": "Текущий провайдер",
+    "email": "Email",
+    "sessionReady": "Активная сессия"
+  },
+  "linking": {
+    "title": "Линковка аккаунтов",
+    "subtitle": "Привяжите дополнительный провайдер к текущему аккаунту.",
+    "browserOnly": "Линковка доступна только в обычном браузере.",
+    "needProvider": "Сначала выполните вход через web-страницы авторизации.",
+    "provider": "Провайдер",
+    "sendCode": "Отправить код подтверждения",
+    "confirmCode": "Подтвердить код и привязать",
+    "googleButton": "Используйте кнопку Google",
+    "telegramButton": "Используйте кнопку Telegram",
+    "telegramHint": "Если Telegram показывает \"Bot domain invalid\", выполните /setdomain в BotFather для этого домена.",
+    "emailCode": "Код подтверждения",
+    "emailCodePlaceholder": "6-значный код из письма",
+    "emailSent": "Код подтверждения отправлен на {{email}}.",
+    "linked": "Успешно привязано: {{provider}}",
+    "reset": "Сбросить форму",
+    "noOptions": "Для текущего провайдера нет доступных вариантов линковки."
+  },
+  "auth": {
+    "loginTitle": "Вход",
+    "loginSubtitle": "Используйте email и пароль.",
+    "registerTitle": "Создание аккаунта",
+    "registerSubtitle": "Зарегистрируйте аккаунт для web-доступа.",
+    "googleTitle": "Вход через Google",
+    "googleSubtitle": "Продолжить с аккаунтом Google.",
+    "browserOnlyTitle": "Это действие доступно только в браузере",
+    "browserOnlyDescription": "Email и Google авторизация доступны только в обычном браузере. В Telegram mini app авторизация выполняется автоматически через Telegram.",
+    "submitLogin": "Войти",
+    "submitRegister": "Создать аккаунт",
+    "passwordConfirm": "Подтвердите пароль",
+    "alreadyHave": "Уже есть аккаунт?",
+    "noAccount": "Нужен аккаунт?",
+    "passwordMismatch": "Подтверждение пароля не совпадает",
+    "sessionReady": "Сессия активна"
+  }
+}

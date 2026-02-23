@@ -158,12 +158,12 @@ Steps:
 2. Open bot chat in Telegram.
 3. Send `/start`.
 4. Open Mini App from the button.
-5. In frontend screen `Auth Smoke Test`, verify:
-   - `Telegram Context` shows `inside Telegram`
-   - `Backend Auth` reaches `success`
-   - user fields (`id`, `role`) are displayed
-
-If needed, paste raw payload into `Manual Re-Run` and press `Authorize Again`.
+5. On Welcome screen, verify:
+   - app opens without errors
+   - Telegram bootstrap auth runs automatically (inside Telegram)
+6. Open `/dashboard` and verify:
+   - active session is visible
+   - user and provider data are shown
 
 ## Web Auth Smoke Test
 
@@ -210,7 +210,7 @@ Steps:
 5. Sign in with same credentials and confirm session card.
 6. Open `http://localhost:3100/auth/google`.
 7. Click Google sign-in button (or use manual idToken fallback) and confirm session card.
-8. Open `http://localhost:3100/` and run `Account Linking` section:
+8. Open `http://localhost:3100/dashboard/linking` and run account linking:
    - linking is available only in standalone browser (disabled inside Telegram Mini App)
    - available providers depend on current sign-in provider:
      - signed in with `google`: `email`, `telegram`
@@ -225,6 +225,15 @@ Notes:
 - `EMAIL_PROVIDER=console` logs verification payload as `auth_email_link_verification`.
 - `EMAIL_PROVIDER=mailerlite` sends verification email through MailerLite API.
 - Link endpoints require bearer access token, so run linking after successful auth.
+
+## UI Baseline
+
+- Welcome page is shared for Telegram Mini App and regular browser.
+- Browser mode uses dashboard sidebar navigation with toggle.
+- Telegram mode uses compact in-page menu for dashboard sections.
+- UI stack is based on shadcn/ui components.
+- Themes: `light`, `dark`, `system`.
+- i18n: `en` and `ru`, with locale JSON dictionaries.
 
 ## Bot Guide (Detailed)
 

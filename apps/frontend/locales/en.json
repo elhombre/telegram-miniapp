@@ -1,0 +1,100 @@
+{
+  "app": {
+    "name": "Miniapp Hub"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "ru": "Russian"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "nav": {
+    "welcome": "Welcome",
+    "dashboard": "Dashboard",
+    "linking": "Linked accounts",
+    "login": "Sign in",
+    "register": "Sign up",
+    "google": "Google",
+    "logout": "Log out"
+  },
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "error": "Error",
+    "success": "Success",
+    "email": "Email",
+    "password": "Password"
+  },
+  "welcome": {
+    "badge": "Telegram Mini App + Web",
+    "title": "One account across Telegram and Web",
+    "subtitle": "Use one user profile, switch providers, and keep all your sessions in one place.",
+    "openDashboard": "Open dashboard",
+    "openLogin": "Sign in",
+    "openRegister": "Create account",
+    "inTelegram": "You are inside Telegram. Session bootstrap runs automatically.",
+    "bootstrapError": "Telegram authorization failed. Please try reopening the mini app.",
+    "features": {
+      "title": "What you get",
+      "identity": "Unified identity with explicit provider linking",
+      "security": "Email verification flow for account linking",
+      "ux": "Friendly interface for both browser and Telegram"
+    }
+  },
+  "dashboard": {
+    "title": "User dashboard",
+    "subtitle": "Manage your profile, providers, and active session.",
+    "telegramMenu": "Menu",
+    "overview": "Overview",
+    "linked": "Linked providers",
+    "session": "Session",
+    "needAuth": "You need to sign in first.",
+    "continueToLogin": "Go to sign in",
+    "userId": "User ID",
+    "role": "Role",
+    "provider": "Current provider",
+    "email": "Email",
+    "sessionReady": "Active session"
+  },
+  "linking": {
+    "title": "Account linking",
+    "subtitle": "Link another provider to your current account.",
+    "browserOnly": "Linking is available only in a regular browser.",
+    "needProvider": "Sign in from web auth pages first.",
+    "provider": "Provider",
+    "sendCode": "Send verification code",
+    "confirmCode": "Confirm code and link",
+    "googleButton": "Use Google button",
+    "telegramButton": "Use Telegram button",
+    "telegramHint": "If Telegram shows \"Bot domain invalid\", run /setdomain in BotFather for this domain.",
+    "emailCode": "Verification code",
+    "emailCodePlaceholder": "6-digit code from email",
+    "emailSent": "Verification code sent to {{email}}.",
+    "linked": "Linked successfully: {{provider}}",
+    "reset": "Reset form",
+    "noOptions": "No linking options available for the current provider."
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "loginSubtitle": "Use your email and password.",
+    "registerTitle": "Create account",
+    "registerSubtitle": "Register a new account for web access.",
+    "googleTitle": "Google sign-in",
+    "googleSubtitle": "Continue with your Google account.",
+    "browserOnlyTitle": "This action is browser-only",
+    "browserOnlyDescription": "Email and Google auth are available only in a regular browser. In Telegram mini app, authorization runs automatically via Telegram.",
+    "submitLogin": "Sign in",
+    "submitRegister": "Create account",
+    "passwordConfirm": "Confirm password",
+    "alreadyHave": "Already have an account?",
+    "noAccount": "Need an account?",
+    "passwordMismatch": "Password confirmation does not match",
+    "sessionReady": "Session is ready"
+  }
+}

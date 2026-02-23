@@ -2,31 +2,29 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import styles from '../auth.module.css'
-import { getCurrentApiMode, getGoogleCallbackEndpoint } from '../../../lib/api'
-import {
-  type AuthResponse,
-  maskToken,
-  parseApiError,
-  persistAuthProvider,
-  persistAuthSession,
-  readStoredSession,
-} from '../../../lib/auth-client'
-import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '../../../lib/google-identity'
+import { AppShell } from '@/components/app/app-shell'
+import { useI18n } from '@/components/app/i18n-provider'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { getGoogleCallbackEndpoint } from '@/lib/api'
+import { type AuthResponse, parseApiError, persistAuthProvider, persistAuthSession } from '@/lib/auth-client'
+import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '@/lib/google-identity'
+import { useTelegramMiniApp } from '@/lib/use-telegram-miniapp'
 
 type SubmitStatus = 'idle' | 'loading' | 'success' | 'error'
 
-const API_MODE = getCurrentApiMode()
-
 export default function GooglePage() {
+  const { t } = useI18n()
+
   const [status, setStatus] = useState<SubmitStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<AuthResponse | null>(null)
-  const [manualIdToken, setManualIdToken] = useState('')
   const [sdkReady, setSdkReady] = useState(false)
+  const { isInTelegram } = useTelegramMiniApp()
+
   const buttonContainerRef = useRef<HTMLDivElement | null>(null)
 
-  const authenticateWithGoogleToken = useCallback(async (idToken: string) => {
+  const authenticate = useCallback(async (idToken: string) => {
     setStatus('loading')
     setError(null)
 
@@ -36,9 +34,7 @@ export default function GooglePage() {
         headers: {
           'content-type': 'application/json',
         },
-        body: JSON.stringify({
-          idToken,
-        }),
+        body: JSON.stringify({ idToken }),
       })
 
       if (!response.ok) {
@@ -50,33 +46,26 @@ export default function GooglePage() {
       persistAuthProvider('google')
       setSession(payload)
       setStatus('success')
-    } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : String(submitError)
+    } catch (authError) {
+      const message = authError instanceof Error ? authError.message : String(authError)
       setStatus('error')
       setError(message)
     }
   }, [])
 
   useEffect(() => {
-    const storedSession = readStoredSession()
-    if (storedSession) {
-      setSession(storedSession)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) {
+    if (isInTelegram === true || !GOOGLE_CLIENT_ID || !buttonContainerRef.current) {
       setSdkReady(false)
       return
     }
 
-    let isCancelled = false
+    let cancelled = false
 
     const initialize = async () => {
       try {
         await loadGoogleIdentityScript()
       } catch (loadError) {
-        if (!isCancelled) {
+        if (!cancelled) {
           const message = loadError instanceof Error ? loadError.message : String(loadError)
           setStatus('error')
           setError(message)
@@ -84,13 +73,12 @@ export default function GooglePage() {
         return
       }
 
-      if (isCancelled || !buttonContainerRef.current) {
+      if (cancelled || !buttonContainerRef.current) {
         return
       }
 
       renderGoogleSignInButton(buttonContainerRef.current, credential => {
-        setManualIdToken(credential)
-        void authenticateWithGoogleToken(credential)
+        void authenticate(credential)
       })
       setSdkReady(true)
     }
@@ -98,96 +86,66 @@ export default function GooglePage() {
     void initialize()
 
     return () => {
-      isCancelled = true
+      cancelled = true
+      if (buttonContainerRef.current) {
+        buttonContainerRef.current.innerHTML = ''
+      }
     }
-  }, [authenticateWithGoogleToken])
+  }, [authenticate, isInTelegram])
+
+  if (isInTelegram !== false) {
+    return (
+      <AppShell session={session}>
+        <Card className="mx-auto max-w-md">
+          <CardHeader>
+            <CardTitle>{isInTelegram === true ? t('auth.browserOnlyTitle') : t('common.loading')}</CardTitle>
+            {isInTelegram === true ? <CardDescription>{t('auth.browserOnlyDescription')}</CardDescription> : null}
+          </CardHeader>
+          <CardContent>
+            {isInTelegram === true ? (
+              <Link href="/">
+                <Button>{t('nav.welcome')}</Button>
+              </Link>
+            ) : null}
+          </CardContent>
+        </Card>
+      </AppShell>
+    )
+  }
 
   return (
-    <div className={styles.page}>
-      <main className={styles.panel}>
-        <header>
-          <p className={styles.kicker}>Web Auth</p>
-          <h1 className={styles.title}>Google Sign-In</h1>
-          <p className={styles.subtitle}>Use Google Identity Services to obtain ID token and exchange it on backend.</p>
-        </header>
-
-        <section className={styles.meta}>
-          <p>API mode: {API_MODE}</p>
-          <p>Endpoint: {getGoogleCallbackEndpoint()}</p>
-          <p>Client ID configured: {GOOGLE_CLIENT_ID ? 'yes' : 'no'}</p>
-        </section>
-
-        <section className={styles.form}>
-          <div ref={buttonContainerRef} />
-          {!sdkReady ? <p className={styles.subtitle}>Google button is unavailable until SDK is initialized.</p> : null}
+    <AppShell session={session}>
+      <Card className="mx-auto max-w-md">
+        <CardHeader>
+          <CardTitle>{t('auth.googleTitle')}</CardTitle>
+          <CardDescription>{t('auth.googleSubtitle')}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div ref={buttonContainerRef} className="min-h-10" />
+          {!sdkReady ? <p className="text-sm text-muted-foreground">{t('common.loading')}</p> : null}
           {!GOOGLE_CLIENT_ID ? (
-            <p className={styles.error}>Set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `apps/frontend/.env`.</p>
+            <p className="text-sm text-destructive">Set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `apps/frontend/.env`.</p>
           ) : null}
-        </section>
 
-        <form
-          className={styles.form}
-          onSubmit={async event => {
-            event.preventDefault()
+          {status === 'success' ? (
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">{t('auth.sessionReady')}</p>
+          ) : null}
+          {status === 'error' && error ? (
+            <p className="text-sm text-destructive">
+              {t('common.error')}: {error}
+            </p>
+          ) : null}
 
-            const token = manualIdToken.trim()
-            if (!token) {
-              setStatus('error')
-              setError('idToken is required')
-              return
-            }
-
-            await authenticateWithGoogleToken(token)
-          }}
-        >
-          <label className={styles.label}>
-            Manual idToken (debug fallback)
-            <input
-              className={styles.input}
-              type="text"
-              value={manualIdToken}
-              onChange={event => setManualIdToken(event.target.value)}
-              placeholder="eyJhbGciOiJSUzI1NiIsInR5cCI..."
-            />
-          </label>
-
-          <div className={styles.actions}>
-            <button className={styles.primary} type="submit" disabled={status === 'loading'}>
-              {status === 'loading' ? 'Authorizing...' : 'Authorize with idToken'}
-            </button>
-            <button
-              className={styles.secondary}
-              type="button"
-              onClick={() => {
-                setManualIdToken('')
-                setStatus('idle')
-                setError(null)
-              }}
-              disabled={status === 'loading'}
-            >
-              Reset
-            </button>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Link href="/auth/login">
+              <Button variant="outline">{t('nav.login')}</Button>
+            </Link>
+            <Link href="/auth/register">
+              <Button variant="outline">{t('nav.register')}</Button>
+            </Link>
           </div>
-        </form>
-
-        {status === 'error' && error ? <p className={styles.error}>Error: {error}</p> : null}
-        {status === 'success' ? <p className={styles.success}>Google session established.</p> : null}
-
-        {session ? (
-          <section className={styles.sessionCard}>
-            <p>User ID: {session.user.id}</p>
-            <p>Email: {session.user.email ?? '—'}</p>
-            <p>Role: {session.user.role}</p>
-            <p>Access: {maskToken(session.accessToken)}</p>
-          </section>
-        ) : null}
-
-        <nav className={styles.links}>
-          <Link href="/auth/register">Email register</Link>
-          <Link href="/auth/login">Email login</Link>
-          <Link href="/">Open mini app screen</Link>
-        </nav>
-      </main>
-    </div>
+        </CardContent>
+      </Card>
+    </AppShell>
   )
 }

@@ -15,10 +15,7 @@ export async function loadGoogleIdentityScript(): Promise<void> {
   await waitForGoogleObject()
 }
 
-export function renderGoogleSignInButton(
-  parent: HTMLElement,
-  onCredential: (credential: string) => void,
-): void {
+export function renderGoogleSignInButton(parent: HTMLElement, onCredential: (credential: string) => void): void {
   if (!GOOGLE_CLIENT_ID) {
     throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID is not configured')
   }
@@ -93,10 +90,7 @@ declare global {
 interface GoogleIdentityWindow {
   accounts?: {
     id?: {
-      initialize: (options: {
-        client_id: string
-        callback: (response: GoogleCredentialResponse) => void
-      }) => void
+      initialize: (options: { client_id: string; callback: (response: GoogleCredentialResponse) => void }) => void
       renderButton: (
         parent: HTMLElement,
         options: {
