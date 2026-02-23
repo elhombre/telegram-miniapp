@@ -187,4 +187,19 @@ function extractStartPayload(text: string | undefined): string | undefined {
   return parts.slice(1).join(' ')
 }
 
-void bootstrap()
+void bootstrap().catch(error => {
+  const message = maskTelegramToken(error instanceof Error ? error.stack ?? error.message : String(error))
+
+  console.error(
+    JSON.stringify({
+      event: 'bot_bootstrap_failed',
+      message,
+    }),
+  )
+
+  process.exitCode = 1
+})
+
+function maskTelegramToken(value: string): string {
+  return value.replace(/bot\d+:[A-Za-z0-9_-]+/g, 'bot<redacted>')
+}

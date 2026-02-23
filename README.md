@@ -93,6 +93,56 @@ Default URLs:
 - backend: `http://localhost:3000/api/v1`
 - frontend: `http://localhost:3100`
 
+## Mini App Auth Smoke Test
+
+Goal: verify Telegram `initDataRaw` is validated on backend and frontend receives auth session.
+
+Preconditions:
+
+1. `apps/bot/.env` has valid `TELEGRAM_BOT_TOKEN`.
+2. `apps/backend/.env` has the same value in `TELEGRAM_BOT_TOKEN`.
+3. `TELEGRAM_MINIAPP_URL` points to the frontend URL that is actually opened inside Telegram.
+
+Backend and frontend config checklist for this test:
+
+1. `apps/backend/.env`
+   - `TELEGRAM_BOT_TOKEN=<same token as apps/bot/.env>`
+   - `FRONTEND_ORIGIN=<public frontend origin opened in Telegram>`
+     - example: `https://<frontend-tunnel>.ngrok-free.app`
+2. `apps/frontend/.env`
+   - `NEXT_PUBLIC_API_BASE_URL=<reachable backend URL>/api/v1`
+     - for phone/Telegram testing this must be public `https://`, not `http://localhost:3000`
+     - example: `https://<backend-tunnel>.ngrok-free.app/api/v1`
+
+Example local tunneling setup:
+
+```bash
+# frontend tunnel
+ngrok http 3100
+
+# backend tunnel
+ngrok http 3000
+```
+
+Then set:
+
+- `apps/bot/.env` -> `TELEGRAM_MINIAPP_URL=https://<frontend-tunnel>.ngrok-free.app`
+- `apps/backend/.env` -> `FRONTEND_ORIGIN=https://<frontend-tunnel>.ngrok-free.app`
+- `apps/frontend/.env` -> `NEXT_PUBLIC_API_BASE_URL=https://<backend-tunnel>.ngrok-free.app/api/v1`
+
+Steps:
+
+1. Start backend, frontend, and bot (polling is enough for this test).
+2. Open bot chat in Telegram.
+3. Send `/start`.
+4. Open Mini App from the button.
+5. In frontend screen `Auth Smoke Test`, verify:
+   - `Telegram Context` shows `inside Telegram`
+   - `Backend Auth` reaches `success`
+   - user fields (`id`, `role`) are displayed
+
+If needed, paste raw payload into `Manual Re-Run` and press `Authorize Again`.
+
 ## Bot Guide (Detailed)
 
 ### 1. Register Bot in Telegram
@@ -252,6 +302,8 @@ yarn workspace bot dev:webhook
   - Ensure webhook is deleted (`deleteWebhook`).
 - Telegram cannot open Mini App.
   - Check `TELEGRAM_MINIAPP_URL` is public HTTPS.
+- Telegram auth endpoint returns signature/authorization error.
+  - Ensure `apps/backend/.env:TELEGRAM_BOT_TOKEN` matches `apps/bot/.env:TELEGRAM_BOT_TOKEN`.
 - Webhook returns unauthorized.
   - Check `TELEGRAM_WEBHOOK_SECRET` and forwarded header `x-telegram-bot-api-secret-token`.
 - Backend DB issues.

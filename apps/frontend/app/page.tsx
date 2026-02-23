@@ -1,102 +1,222 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+'use client'
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import styles from './page.module.css'
+import { applyTelegramTheme, getTelegramWebApp, type TelegramWebAppUser } from '../lib/telegram'
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+interface AuthResponse {
+  accessToken: string
+  refreshToken: string
+  expiresIn: number
+  user: {
+    id: string
+    role: string
+    email: string | null
+  }
+}
 
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+interface ApiErrorResponse {
+  code?: string
+  message?: string
+}
+
+type AuthStatus = 'idle' | 'loading' | 'success' | 'error'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api/v1'
 
 export default function Home() {
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('idle')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [authResponse, setAuthResponse] = useState<AuthResponse | null>(null)
+  const [isInTelegram, setIsInTelegram] = useState(false)
+  const [initDataRaw, setInitDataRaw] = useState<string>('')
+  const [telegramUser, setTelegramUser] = useState<TelegramWebAppUser | null>(null)
+
+  const authenticate = useCallback(async (rawInitData: string) => {
+    setAuthStatus('loading')
+    setAuthError(null)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/telegram/verify-init-data`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          initDataRaw: rawInitData,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorPayload = (await response.json()) as ApiErrorResponse
+        throw new Error(errorPayload.message || errorPayload.code || `HTTP ${response.status}`)
+      }
+
+      const payload = (await response.json()) as AuthResponse
+      setAuthResponse(payload)
+      persistAuthSession(payload)
+      setAuthStatus('success')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setAuthStatus('error')
+      setAuthError(message)
+    }
+  }, [])
+
+  useEffect(() => {
+    let attempts = 0
+    const maxAttempts = 40
+    const retryIntervalMs = 125
+
+    const initializeTelegramContext = () => {
+      const telegramWebApp = getTelegramWebApp()
+      if (!telegramWebApp) {
+        return false
+      }
+
+      setIsInTelegram(true)
+      telegramWebApp.ready()
+      telegramWebApp.expand()
+      applyTelegramTheme(telegramWebApp.themeParams)
+
+      setInitDataRaw(telegramWebApp.initData ?? '')
+      setTelegramUser(telegramWebApp.initDataUnsafe.user ?? null)
+
+      return true
+    }
+
+    if (initializeTelegramContext()) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      attempts += 1
+
+      const initialized = initializeTelegramContext()
+      if (initialized || attempts >= maxAttempts) {
+        window.clearInterval(intervalId)
+        if (!initialized) {
+          setIsInTelegram(false)
+        }
+      }
+    }, retryIntervalMs)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!initDataRaw) {
+      return
+    }
+
+    void authenticate(initDataRaw)
+  }, [authenticate, initDataRaw])
+
+  const userName = useMemo(() => formatUserName(telegramUser), [telegramUser])
+
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+      <main className={styles.panel}>
+        <header className={styles.header}>
+          <p className={styles.kicker}>Telegram Mini App</p>
+          <h1 className={styles.title}>Auth Smoke Test</h1>
+          <p className={styles.subtitle}>
+            Verifies Mini App identity by sending <code>initDataRaw</code> to backend.
+          </p>
+        </header>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
+        <section className={styles.grid}>
+          <article className={styles.card}>
+            <h2>Telegram Context</h2>
+            <p>Status: {isInTelegram ? 'inside Telegram' : 'regular browser'}</p>
+            <p>User: {userName}</p>
+            <p>Payload size: {initDataRaw.length} chars</p>
+          </article>
+
+          <article className={styles.card}>
+            <h2>Backend Auth</h2>
+            <p>Status: {authStatus}</p>
+            {authStatus === 'error' && authError ? <p className={styles.error}>Error: {authError}</p> : null}
+            {authResponse ? (
+              <div className={styles.authData}>
+                <p>User ID: {authResponse.user.id}</p>
+                <p>Role: {authResponse.user.role}</p>
+                <p>Email: {authResponse.user.email ?? '—'}</p>
+                <p>Access TTL: {authResponse.expiresIn}s</p>
+              </div>
+            ) : null}
+          </article>
+        </section>
+
+        <section className={styles.manualSection}>
+          <h2>Manual Re-Run</h2>
+          <textarea
+            className={styles.textarea}
+            value={initDataRaw}
+            onChange={event => setInitDataRaw(event.target.value)}
+            placeholder="Paste initDataRaw from Telegram if needed"
+            rows={5}
+          />
+          <div className={styles.actions}>
+            <button
+              className={styles.primary}
+              type="button"
+              onClick={() => {
+                if (!initDataRaw.trim()) {
+                  setAuthStatus('error')
+                  setAuthError('initDataRaw is empty')
+                  return
+                }
+                void authenticate(initDataRaw.trim())
+              }}
+              disabled={authStatus === 'loading'}
+            >
+              {authStatus === 'loading' ? 'Authorizing...' : 'Authorize Again'}
+            </button>
+            <button
+              className={styles.secondary}
+              type="button"
+              onClick={() => {
+                setAuthResponse(null)
+                setAuthError(null)
+                setAuthStatus('idle')
+                sessionStorage.removeItem('miniapp.accessToken')
+                sessionStorage.removeItem('miniapp.refreshToken')
+              }}
+            >
+              Clear Local Session
+            </button>
+          </div>
+        </section>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
     </div>
-  );
+  )
+}
+
+function persistAuthSession(payload: AuthResponse) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  sessionStorage.setItem('miniapp.accessToken', payload.accessToken)
+  sessionStorage.setItem('miniapp.refreshToken', payload.refreshToken)
+}
+
+function formatUserName(user: TelegramWebAppUser | null): string {
+  if (!user) {
+    return 'unknown'
+  }
+
+  const name = [user.first_name, user.last_name].filter(Boolean).join(' ').trim()
+  if (name) {
+    return name
+  }
+
+  if (user.username) {
+    return `@${user.username}`
+  }
+
+  return `id:${user.id}`
 }
