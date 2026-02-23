@@ -1,11 +1,21 @@
 type ApiMode = 'proxy' | 'direct'
 
 const TELEGRAM_VERIFY_INIT_DATA_PATH = 'telegram/verify-init-data'
+const EMAIL_REGISTER_PATH = 'email/register'
+const EMAIL_LOGIN_PATH = 'email/login'
 const REFRESH_SESSION_PATH = 'refresh'
 const LOGOUT_PATH = 'logout'
 
 export function getTelegramVerifyInitDataEndpoint(): string {
   return getAuthEndpoint(TELEGRAM_VERIFY_INIT_DATA_PATH)
+}
+
+export function getEmailRegisterEndpoint(): string {
+  return getAuthEndpoint(EMAIL_REGISTER_PATH)
+}
+
+export function getEmailLoginEndpoint(): string {
+  return getAuthEndpoint(EMAIL_LOGIN_PATH)
 }
 
 export function getRefreshSessionEndpoint(): string {

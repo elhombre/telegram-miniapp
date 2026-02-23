@@ -155,6 +155,31 @@ Steps:
 
 If needed, paste raw payload into `Manual Re-Run` and press `Authorize Again`.
 
+## Web Email Auth Smoke Test
+
+Goal: verify standalone web frontend can register/login via backend and store session.
+
+Preconditions:
+
+1. Backend is running (`yarn workspace backend dev`).
+2. Frontend is running (`yarn workspace frontend dev`).
+3. `apps/frontend/.env` has valid API mode setup:
+   - recommended local: `NEXT_PUBLIC_API_MODE=proxy`
+   - `BACKEND_API_BASE_URL=http://localhost:3000/api/v1`
+
+Steps:
+
+1. Open `http://localhost:3100/auth/register`.
+2. Register with email and password (min length 8).
+3. Confirm success message and session card.
+4. Open `http://localhost:3100/auth/login`.
+5. Sign in with same credentials and confirm session card.
+
+Notes:
+
+- Current MVP flow does not require email delivery/verification service yet.
+- Email delivery provider is planned for verification/reset-password phase.
+
 ## Bot Guide (Detailed)
 
 ### 1. Register Bot in Telegram

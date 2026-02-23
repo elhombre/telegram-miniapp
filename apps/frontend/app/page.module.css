@@ -109,6 +109,15 @@
   flex-wrap: wrap;
 }
 
+.navLinks {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: var(--font-geist-mono);
+  font-size: 0.86rem;
+  color: var(--tg-link-color, #6fc0ff);
+}
+
 .primary,
 .secondary {
   appearance: none;
