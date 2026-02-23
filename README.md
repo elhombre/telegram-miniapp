@@ -1,133 +1,264 @@
-# Turborepo starter
+# Telegram Mini App Monorepo
 
-This Turborepo starter is maintained by the Turborepo core team.
+Production-first monorepo for Telegram Mini App + Web frontend + Backend API + Telegram bot.
 
-## Using this example
+## Stack
 
-Run the following command:
+- Monorepo: Turborepo
+- Package manager: Yarn 4 (PnP)
+- Frontend: Next.js (`apps/frontend`)
+- Backend: NestJS + Prisma + Postgres (`apps/backend`)
+- Bot: grammY (`apps/bot`)
+- Lint/format: Biome
 
-```sh
-npx create-turbo@latest
+## Repository Layout
+
+- `apps/frontend`: web and mini app frontend
+- `apps/backend`: API and auth core
+- `apps/bot`: Telegram bot runtime
+- `packages/ui`: shared UI package
+- `packages/typescript-config`: shared TS configs
+- `docker-compose.yml`: local Postgres
+
+## Prerequisites
+
+- Node.js 20+
+- Yarn 4+ (project uses `yarn@4.9.4`)
+- Docker Desktop (for local Postgres)
+- Telegram account for bot setup
+
+## Initial Setup
+
+1. Install dependencies.
+
+```bash
+cd code
+yarn install
 ```
 
-## What's inside?
+2. Create env files.
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `frontend`: a [Next.js](https://nextjs.org/) app
-- `backend`: a [NestJS](https://nestjs.com/) app
-- `@repo/ui`: a stub React component library shared by UI applications
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [Biome](https://biomejs.dev/) for code linting and formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+```bash
+cp .env.example .env
+cp apps/backend/.env.example apps/backend/.env
+cp apps/frontend/.env.example apps/frontend/.env
+cp apps/bot/.env.example apps/bot/.env
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+3. Fill required secrets.
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+- `apps/backend/.env`
+  - `JWT_ACCESS_SECRET`
+  - `JWT_REFRESH_SECRET`
+- `apps/bot/.env`
+  - `TELEGRAM_BOT_TOKEN`
+  - `TELEGRAM_MINIAPP_URL`
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+4. Start Postgres.
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```bash
+docker compose up -d postgres
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+5. Apply database migrations.
 
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+```bash
+yarn workspace backend prisma:migrate:deploy
 ```
 
-### Remote Caching
+## Run Locally
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+Open 3 terminals from `code/`.
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+Terminal 1, backend:
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+```bash
+yarn workspace backend dev
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+Terminal 2, frontend:
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+```bash
+yarn workspace frontend dev
 ```
 
-## Useful Links
+Terminal 3, bot in polling mode:
 
-Learn more about the power of Turborepo:
+```bash
+yarn workspace bot dev
+```
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Default URLs:
+
+- backend: `http://localhost:3000/api/v1`
+- frontend: `http://localhost:3100`
+
+## Bot Guide (Detailed)
+
+### 1. Register Bot in Telegram
+
+Use BotFather in Telegram.
+
+1. Open `@BotFather`.
+2. Run `/newbot`.
+3. Set bot name and username.
+4. Copy generated token.
+5. Put token into `apps/bot/.env` as `TELEGRAM_BOT_TOKEN`.
+
+Optional hardening:
+
+- If token leaked, run `/revoke` in BotFather and update env.
+
+### 2. Configure Mini App URL
+
+Set `TELEGRAM_MINIAPP_URL` in `apps/bot/.env`.
+
+Important:
+
+- Telegram clients require a public `https://` URL for Mini App.
+- `http://localhost:3100` is not usable directly inside Telegram clients.
+
+Local testing options:
+
+1. Run frontend locally (`yarn workspace frontend dev`).
+2. Expose it via tunnel (for example ngrok/cloudflared).
+3. Set `TELEGRAM_MINIAPP_URL` to tunnel HTTPS URL.
+
+Example with ngrok:
+
+```bash
+ngrok http 3100
+# set TELEGRAM_MINIAPP_URL=https://<your-id>.ngrok-free.app
+```
+
+### 3. Menu Button and Commands
+
+On bot startup, app configures automatically:
+
+- commands: `/start`, `/link`
+- chat menu button (`web_app`) using:
+  - `TELEGRAM_MENU_BUTTON_TEXT`
+  - `TELEGRAM_MINIAPP_URL`
+
+You normally do not need manual BotFather setup for menu button if bot is running and can call Telegram API.
+
+### 4. Optional Startapp Deep Link
+
+If you want direct link format `https://t.me/<bot>/<mini_app_short_name>?startapp=...`:
+
+1. Create Mini App short name in BotFather (Mini App/Web App flow).
+2. Put it into `TELEGRAM_MINIAPP_SHORT_NAME`.
+3. Run `/link` in bot chat to get generated deep link.
+
+### 5. Local Mode: Polling
+
+Use polling for local development.
+
+`apps/bot/.env`:
+
+- `BOT_MODE=polling`
+
+Run:
+
+```bash
+yarn workspace bot dev
+```
+
+Test flow:
+
+1. Open chat with your bot.
+2. Send `/start`.
+3. Click inline `web_app` button.
+
+### 6. Local Mode: Webhook (Optional)
+
+Use when you want to test webhook behavior locally.
+
+Required env in `apps/bot/.env`:
+
+- `BOT_MODE=webhook`
+- `TELEGRAM_WEBHOOK_BASE_URL=https://<public-domain>`
+- `TELEGRAM_WEBHOOK_PATH=/telegram/webhook`
+- `TELEGRAM_WEBHOOK_SECRET=<strong-random-value>`
+- `TELEGRAM_WEBHOOK_PORT=3200`
+
+Run:
+
+```bash
+yarn workspace bot dev:webhook
+```
+
+Expose bot webhook port (or reverse proxy to it) on public HTTPS URL so Telegram can reach it.
+
+Health endpoint in webhook mode:
+
+- `GET /healthz`
+
+### 7. Production Server Mode (Webhook)
+
+Recommended for real deployment.
+
+1. Deploy frontend to public HTTPS.
+2. Deploy backend API.
+3. Deploy bot process with `BOT_MODE=webhook`.
+4. Set production env values in `apps/bot/.env`.
+5. Run bot:
+
+```bash
+yarn workspace bot build
+yarn workspace bot start:webhook
+```
+
+Typical reverse proxy routing:
+
+- public `https://bot.example.com/telegram/webhook` -> bot container/process `0.0.0.0:3200/telegram/webhook`
+
+Verify webhook status:
+
+```bash
+curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
+```
+
+Reset webhook when switching from webhook to polling:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/deleteWebhook?drop_pending_updates=true"
+```
+
+## Commands Cheat Sheet
+
+Monorepo level:
+
+```bash
+yarn dev
+yarn build
+yarn lint
+yarn check-types
+```
+
+App level:
+
+```bash
+yarn workspace backend dev
+yarn workspace backend prisma:migrate:deploy
+yarn workspace frontend dev
+yarn workspace bot dev
+yarn workspace bot dev:webhook
+```
+
+## Troubleshooting
+
+- Bot does not receive updates in polling mode.
+  - Ensure webhook is deleted (`deleteWebhook`).
+- Telegram cannot open Mini App.
+  - Check `TELEGRAM_MINIAPP_URL` is public HTTPS.
+- Webhook returns unauthorized.
+  - Check `TELEGRAM_WEBHOOK_SECRET` and forwarded header `x-telegram-bot-api-secret-token`.
+- Backend DB issues.
+  - Re-run compose + migrations and verify tables. See `../docs/runbooks/backend-phase1-db-verification.md`.
+
+## Notes
+
+- Keep `.env` files out of VCS.
+- Do not store real bot tokens in commits.
+- Update docs and Postman assets together with API contract changes.
