@@ -3,6 +3,7 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { UserRole, type IdentityProvider } from './mocks/prisma-client.mock'
 import request from 'supertest'
 import { AppModule } from '../src/app.module'
+import { EmailSenderService, type EmailLinkVerificationPayload } from '../src/auth/email-sender.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 
 type JsonObject = Record<string, unknown>
@@ -354,6 +355,7 @@ function createPrismaMock(state: InMemoryState) {
 
 describe('AuthController (e2e)', () => {
   let app: Awaited<ReturnType<TestingModule['createNestApplication']>>
+  let lastEmailLinkPayload: EmailLinkVerificationPayload | null = null
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test'
@@ -375,12 +377,19 @@ describe('AuthController (e2e)', () => {
     }
 
     const prismaMock = createPrismaMock(state)
+    const emailSenderMock = {
+      sendEmailLinkVerification: async (payload: EmailLinkVerificationPayload) => {
+        lastEmailLinkPayload = payload
+      },
+    }
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
+      .overrideProvider(EmailSenderService)
+      .useValue(emailSenderMock)
       .compile()
 
     app = moduleFixture.createNestApplication()
@@ -400,6 +409,8 @@ describe('AuthController (e2e)', () => {
   })
 
   it('executes register -> login -> refresh -> link -> logout flow', async () => {
+    lastEmailLinkPayload = null
+
     const registerResponse = await request(app.getHttpServer()).post('/api/v1/auth/email/register').send({
       email: 'user@example.com',
       password: 'StrongPass123',
@@ -434,14 +445,26 @@ describe('AuthController (e2e)', () => {
     expect(linkStartResponse.status).toBe(201)
     expect(linkStartResponse.body.linkToken).toEqual(expect.any(String))
 
-    const linkConfirmResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/link/confirm')
+    const linkEmailRequestResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/link/email/request')
       .set('Authorization', `Bearer ${loginResponse.body.accessToken}`)
       .send({
         linkToken: linkStartResponse.body.linkToken,
-        provider: 'email',
         email: 'linked@example.com',
-        password: 'LinkedPass123',
+      })
+
+    expect(linkEmailRequestResponse.status).toBe(201)
+    expect(linkEmailRequestResponse.body.sent).toBe(true)
+    expect(lastEmailLinkPayload?.to).toBe('linked@example.com')
+    expect(lastEmailLinkPayload?.code).toMatch(/^\d{6}$/)
+
+    const linkConfirmResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/link/email/confirm')
+      .set('Authorization', `Bearer ${loginResponse.body.accessToken}`)
+      .send({
+        linkToken: linkStartResponse.body.linkToken,
+        email: 'linked@example.com',
+        code: lastEmailLinkPayload?.code,
       })
 
     expect(linkConfirmResponse.status).toBe(201)

@@ -20,6 +20,11 @@ Production-first monorepo for Telegram Mini App + Web frontend + Backend API + T
 - `packages/typescript-config`: shared TS configs
 - `docker-compose.yml`: local Postgres
 
+## Delivery Status
+
+- Phases 0-4 are implemented.
+- Current focus is Phase 5 (hardening and release readiness).
+
 ## Prerequisites
 
 - Node.js 20+
@@ -50,6 +55,11 @@ cp apps/bot/.env.example apps/bot/.env
 - `apps/backend/.env`
   - `JWT_ACCESS_SECRET`
   - `JWT_REFRESH_SECRET`
+  - optional email delivery settings:
+    - `EMAIL_PROVIDER=mailerlite`
+    - `MAILERLITE_TOKEN=<your_mailerlite_token>`
+    - `EMAIL_FROM_EMAIL=<verified_sender_email>`
+    - `EMAIL_FROM_NAME=<sender_name>`
 - `apps/bot/.env`
   - `TELEGRAM_BOT_TOKEN`
   - `TELEGRAM_MINIAPP_URL`
@@ -206,15 +216,15 @@ Steps:
      - signed in with `google`: `email`, `telegram`
      - signed in with `email`: `google`, `telegram`
    - `google`: click Google sign-in button inside linking section (linking starts automatically)
-   - `email`: fill email + password and click `Link Provider`
+   - `email`: fill email, click `Send Verification Code`, then enter 6-digit code and click `Confirm Code & Link`
    - `telegram`: click Telegram Login Widget button inside linking section
 
 Notes:
 
-- Current MVP flow does not require email delivery/verification service yet.
-- Email delivery provider is planned for verification/reset-password phase.
+- Email linking now uses verification code flow.
+- `EMAIL_PROVIDER=console` logs verification payload as `auth_email_link_verification`.
+- `EMAIL_PROVIDER=mailerlite` sends verification email through MailerLite API.
 - Link endpoints require bearer access token, so run linking after successful auth.
-- Email linking still uses password in current MVP; migration to email verification link/code flow is planned.
 
 ## Bot Guide (Detailed)
 

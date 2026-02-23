@@ -18,7 +18,11 @@ import { PrismaService } from '../prisma/prisma.service'
 import type { EmailLoginDto } from './dto/email-login.dto'
 import type { EmailRegisterDto } from './dto/email-register.dto'
 import type { GoogleCallbackDto } from './dto/google-callback.dto'
+import type { LinkEmailConfirmDto } from './dto/link-email-confirm.dto'
+import type { LinkEmailRequestDto } from './dto/link-email-request.dto'
 import { type LinkConfirmDto, LinkProviderDto } from './dto/link-confirm.dto'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
+import { EmailSenderService } from './email-sender.service'
 import type { LogoutDto } from './dto/logout.dto'
 import type { RefreshTokenDto } from './dto/refresh-token.dto'
 import type { TelegramVerifyInitDataDto } from './dto/telegram-verify-init-data.dto'
@@ -54,6 +58,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailSender: EmailSenderService,
   ) {}
 
   async registerWithEmail(dto: EmailRegisterDto, request: Request): Promise<AuthResponse> {
@@ -380,32 +385,134 @@ export class AuthService {
     }
   }
 
-  async confirmLink(user: AuthUser, dto: LinkConfirmDto): Promise<{ linked: true; provider: LinkProviderDto }> {
-    const tokenHash = this.hashToken(dto.linkToken)
+  async requestEmailLink(
+    user: AuthUser,
+    dto: LinkEmailRequestDto,
+  ): Promise<{ sent: true; provider: LinkProviderDto.email; email: string; expiresAt: string }> {
+    const normalizedEmail = this.normalizeEmail(dto.email)
+    const linkToken = await this.resolveActiveLinkToken(user.userId, dto.linkToken)
 
-    const linkToken = await this.prisma.accountLinkToken.findUnique({
-      where: { tokenHash },
-      select: {
-        id: true,
-        userId: true,
-        consumedAt: true,
-        expiresAt: true,
-      },
+    await this.assertEmailCanBeLinked(user.userId, normalizedEmail)
+
+    const verificationCode = this.createEmailLinkCode(user.userId, dto.linkToken, normalizedEmail)
+    const confirmUrl = this.buildEmailLinkConfirmUrl(dto.linkToken, normalizedEmail, verificationCode)
+
+    try {
+      await this.emailSender.sendEmailLinkVerification({
+        to: normalizedEmail,
+        code: verificationCode,
+        expiresAt: linkToken.expiresAt,
+        confirmUrl,
+      })
+    } catch {
+      throw new ServiceUnavailableException({
+        code: 'EMAIL_DELIVERY_FAILED',
+        message: 'Failed to deliver verification email',
+      })
+    }
+
+    return {
+      sent: true,
+      provider: LinkProviderDto.email,
+      email: this.maskEmail(normalizedEmail),
+      expiresAt: linkToken.expiresAt.toISOString(),
+    }
+  }
+
+  async confirmEmailLink(
+    user: AuthUser,
+    dto: LinkEmailConfirmDto,
+  ): Promise<{ linked: true; provider: LinkProviderDto.email }> {
+    const normalizedEmail = this.normalizeEmail(dto.email)
+    const linkToken = await this.resolveActiveLinkToken(user.userId, dto.linkToken)
+    const expectedCode = this.createEmailLinkCode(user.userId, dto.linkToken, normalizedEmail)
+
+    if (!this.isSafeEqual(expectedCode, dto.code.trim())) {
+      throw new UnauthorizedException({
+        code: 'INVALID_EMAIL_LINK_CODE',
+        message: 'Email verification code is invalid',
+      })
+    }
+
+    await this.prisma.$transaction(async tx => {
+      const existingIdentity = await tx.identity.findUnique({
+        where: {
+          provider_providerUserId: {
+            provider: IdentityProvider.EMAIL,
+            providerUserId: normalizedEmail,
+          },
+        },
+        select: {
+          id: true,
+          userId: true,
+        },
+      })
+
+      if (existingIdentity && existingIdentity.userId !== user.userId) {
+        throw new ConflictException({
+          code: 'EMAIL_ALREADY_IN_USE',
+          message: 'Email is already linked to another account',
+        })
+      }
+
+      if (!existingIdentity) {
+        const createData: Prisma.IdentityCreateInput = {
+          provider: IdentityProvider.EMAIL,
+          providerUserId: normalizedEmail,
+          email: normalizedEmail,
+          user: {
+            connect: { id: user.userId },
+          },
+          metadata: {
+            linkedVia: 'email_verification_code',
+          } as Prisma.InputJsonValue,
+        }
+
+        await tx.identity.create({ data: createData })
+      }
+
+      const userRecord = await tx.user.findUnique({
+        where: { id: user.userId },
+        select: { email: true, emailVerifiedAt: true },
+      })
+
+      const userUpdateData: Prisma.UserUpdateInput = {}
+
+      if (!userRecord?.email) {
+        userUpdateData.email = normalizedEmail
+        userUpdateData.emailVerifiedAt = new Date()
+      } else if (userRecord.email === normalizedEmail && !userRecord.emailVerifiedAt) {
+        userUpdateData.emailVerifiedAt = new Date()
+      }
+
+      if (Object.keys(userUpdateData).length > 0) {
+        await tx.user.update({
+          where: { id: user.userId },
+          data: userUpdateData,
+        })
+      }
+
+      await tx.accountLinkToken.update({
+        where: { id: linkToken.id },
+        data: { consumedAt: new Date() },
+      })
     })
 
-    if (!linkToken || linkToken.userId !== user.userId) {
-      throw new UnauthorizedException({
-        code: 'INVALID_LINK_TOKEN',
-        message: 'Link token is invalid',
+    return {
+      linked: true,
+      provider: LinkProviderDto.email,
+    }
+  }
+
+  async confirmLink(user: AuthUser, dto: LinkConfirmDto): Promise<{ linked: true; provider: LinkProviderDto }> {
+    if (dto.provider === LinkProviderDto.email) {
+      throw new BadRequestException({
+        code: 'EMAIL_LINK_VERIFICATION_REQUIRED',
+        message: 'Use /auth/link/email/request and /auth/link/email/confirm for email linking',
       })
     }
 
-    if (linkToken.consumedAt || linkToken.expiresAt.getTime() <= Date.now()) {
-      throw new UnauthorizedException({
-        code: 'EXPIRED_LINK_TOKEN',
-        message: 'Link token is expired or already used',
-      })
-    }
+    const linkToken = await this.resolveActiveLinkToken(user.userId, dto.linkToken)
 
     const provider = this.mapLinkProvider(dto.provider)
     let normalizedEmail = dto.email ? this.normalizeEmail(dto.email) : undefined
@@ -445,7 +552,6 @@ export class AuthService {
       normalizedEmail,
       verifiedProviderUserId,
     )
-    const passwordHash = await this.resolvePasswordHash(dto)
     const mergedMetadata = this.mergeLinkMetadata(dto.metadata, providerMetadata)
 
     const existingIdentity = await this.prisma.identity.findUnique({
@@ -474,7 +580,6 @@ export class AuthService {
           provider,
           providerUserId,
           email: normalizedEmail,
-          passwordHash,
           metadata: mergedMetadata as Prisma.InputJsonValue | undefined,
           user: {
             connect: { id: user.userId },
@@ -482,20 +587,6 @@ export class AuthService {
         }
 
         await tx.identity.create({ data: createData })
-      }
-
-      if (provider === IdentityProvider.EMAIL && normalizedEmail) {
-        const userRecord = await tx.user.findUnique({
-          where: { id: user.userId },
-          select: { email: true },
-        })
-
-        if (!userRecord?.email) {
-          await tx.user.update({
-            where: { id: user.userId },
-            data: { email: normalizedEmail },
-          })
-        }
       }
 
       await tx.accountLinkToken.update({
@@ -614,19 +705,128 @@ export class AuthService {
     return providerUserId.trim()
   }
 
-  private async resolvePasswordHash(dto: LinkConfirmDto): Promise<string | undefined> {
-    if (dto.provider !== LinkProviderDto.email) {
-      return undefined
-    }
+  private async resolveActiveLinkToken(
+    userId: string,
+    rawLinkToken: string,
+  ): Promise<{ id: string; expiresAt: Date }> {
+    const tokenHash = this.hashToken(rawLinkToken)
 
-    if (!dto.password) {
-      throw new BadRequestException({
-        code: 'PASSWORD_REQUIRED',
-        message: 'password is required for email identity linking',
+    const linkToken = await this.prisma.accountLinkToken.findUnique({
+      where: { tokenHash },
+      select: {
+        id: true,
+        userId: true,
+        consumedAt: true,
+        expiresAt: true,
+      },
+    })
+
+    if (!linkToken || linkToken.userId !== userId) {
+      throw new UnauthorizedException({
+        code: 'INVALID_LINK_TOKEN',
+        message: 'Link token is invalid',
       })
     }
 
-    return argon2.hash(dto.password)
+    if (linkToken.consumedAt || linkToken.expiresAt.getTime() <= Date.now()) {
+      throw new UnauthorizedException({
+        code: 'EXPIRED_LINK_TOKEN',
+        message: 'Link token is expired or already used',
+      })
+    }
+
+    return {
+      id: linkToken.id,
+      expiresAt: linkToken.expiresAt,
+    }
+  }
+
+  private async assertEmailCanBeLinked(userId: string, normalizedEmail: string): Promise<void> {
+    const existingEmailIdentity = await this.prisma.identity.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider: IdentityProvider.EMAIL,
+          providerUserId: normalizedEmail,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
+    })
+
+    if (existingEmailIdentity?.userId && existingEmailIdentity.userId !== userId) {
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_IN_USE',
+        message: 'Email is already linked to another account',
+      })
+    }
+
+    if (existingEmailIdentity?.userId === userId) {
+      throw new ConflictException({
+        code: 'IDENTITY_ALREADY_LINKED',
+        message: 'This email is already linked',
+      })
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    })
+
+    if (existingUser?.id && existingUser.id !== userId) {
+      throw new ConflictException({
+        code: 'EMAIL_ALREADY_IN_USE',
+        message: 'Email is already in use by another account',
+      })
+    }
+  }
+
+  private createEmailLinkCode(userId: string, linkToken: string, normalizedEmail: string): string {
+    const digest = createHmac('sha256', this.env.JWT_ACCESS_SECRET)
+      .update(`email-link:${userId}:${linkToken}:${normalizedEmail}`)
+      .digest('hex')
+
+    const numericCode = Number.parseInt(digest.slice(0, 12), 16) % 1_000_000
+    return numericCode.toString().padStart(6, '0')
+  }
+
+  private buildEmailLinkConfirmUrl(linkToken: string, normalizedEmail: string, code: string): string | undefined {
+    if (!this.env.FRONTEND_ORIGIN) {
+      return undefined
+    }
+
+    const url = new URL('/', this.env.FRONTEND_ORIGIN)
+    url.searchParams.set('link_provider', 'email')
+    url.searchParams.set('link_token', linkToken)
+    url.searchParams.set('link_email', normalizedEmail)
+    url.searchParams.set('link_code', code)
+
+    return url.toString()
+  }
+
+  private maskEmail(email: string): string {
+    const [localPart, domain] = email.split('@')
+    if (!localPart || !domain) {
+      return email
+    }
+
+    if (localPart.length <= 2) {
+      return `${localPart[0] ?? '*'}***@${domain}`
+    }
+
+    return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`
+  }
+
+  private isSafeEqual(left: string, right: string): boolean {
+    const leftBuffer = Buffer.from(left)
+    const rightBuffer = Buffer.from(right)
+
+    if (leftBuffer.length !== rightBuffer.length) {
+      return false
+    }
+
+    return timingSafeEqual(leftBuffer, rightBuffer)
   }
 
   private async verifyGoogleIdToken(idToken: string): Promise<TokenPayload> {

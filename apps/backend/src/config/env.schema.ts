@@ -1,5 +1,6 @@
 export type NodeEnv = 'development' | 'test' | 'production'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type EmailProvider = 'console' | 'mailerlite'
 
 export interface AppEnv {
   NODE_ENV: NodeEnv
@@ -16,6 +17,10 @@ export interface AppEnv {
   TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: number
   GOOGLE_CLIENT_ID?: string
   ACCOUNT_LINK_TOKEN_TTL_MINUTES: number
+  EMAIL_PROVIDER: EmailProvider
+  EMAIL_FROM_EMAIL?: string
+  EMAIL_FROM_NAME: string
+  MAILERLITE_TOKEN?: string
 }
 
 let cachedEnv: AppEnv | undefined
@@ -26,6 +31,8 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   const errors: string[] = []
+  const mailerLiteToken = parseOptionalString(rawEnv.MAILERLITE_TOKEN)
+  const emailProviderFallback: EmailProvider = mailerLiteToken ? 'mailerlite' : 'console'
 
   const env: AppEnv = {
     NODE_ENV: parseEnum(rawEnv.NODE_ENV, 'NODE_ENV', ['development', 'test', 'production'], 'development', errors),
@@ -57,6 +64,26 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
       10,
       errors,
     ),
+    EMAIL_PROVIDER: parseEnum(
+      rawEnv.EMAIL_PROVIDER,
+      'EMAIL_PROVIDER',
+      ['console', 'mailerlite'],
+      emailProviderFallback,
+      errors,
+    ),
+    EMAIL_FROM_EMAIL: parseOptionalEmail(rawEnv.EMAIL_FROM_EMAIL, 'EMAIL_FROM_EMAIL', errors),
+    EMAIL_FROM_NAME: parseNonEmptyString(rawEnv.EMAIL_FROM_NAME, 'EMAIL_FROM_NAME', 'Telegram Miniapp', errors),
+    MAILERLITE_TOKEN: mailerLiteToken,
+  }
+
+  if (env.EMAIL_PROVIDER === 'mailerlite') {
+    if (!env.MAILERLITE_TOKEN) {
+      errors.push('MAILERLITE_TOKEN is required when EMAIL_PROVIDER=mailerlite')
+    }
+
+    if (!env.EMAIL_FROM_EMAIL) {
+      errors.push('EMAIL_FROM_EMAIL is required when EMAIL_PROVIDER=mailerlite')
+    }
   }
 
   if (errors.length > 0) {
@@ -145,6 +172,40 @@ function parseRequiredString(rawValue: string | undefined, variableName: string,
 function parseOptionalString(rawValue: string | undefined): string | undefined {
   const value = rawValue?.trim()
   return value ? value : undefined
+}
+
+function parseNonEmptyString(
+  rawValue: string | undefined,
+  variableName: string,
+  fallback: string,
+  errors: string[],
+): string {
+  const value = (rawValue ?? fallback).trim()
+  if (!value) {
+    errors.push(`${variableName} cannot be empty`)
+    return fallback
+  }
+
+  return value
+}
+
+function parseOptionalEmail(
+  rawValue: string | undefined,
+  variableName: string,
+  errors: string[],
+): string | undefined {
+  const value = rawValue?.trim()
+  if (!value) {
+    return undefined
+  }
+
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  if (!isEmail) {
+    errors.push(`${variableName} must be a valid email, got "${rawValue}"`)
+    return undefined
+  }
+
+  return value
 }
 
 function parsePositiveInt(

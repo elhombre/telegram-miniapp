@@ -13,6 +13,10 @@ import { EmailRegisterDto } from './dto/email-register.dto'
 // biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { GoogleCallbackDto } from './dto/google-callback.dto'
 // biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
+import { LinkEmailConfirmDto } from './dto/link-email-confirm.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
+import { LinkEmailRequestDto } from './dto/link-email-request.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { LinkConfirmDto } from './dto/link-confirm.dto'
 // biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { LogoutDto } from './dto/logout.dto'
@@ -76,5 +80,19 @@ export class AuthController {
   @Roles(UserRole.USER, UserRole.ADMIN)
   confirmLink(@CurrentUser() user: AuthUser, @Body() dto: LinkConfirmDto) {
     return this.authService.confirmLink(user, dto)
+  }
+
+  @Post('link/email/request')
+  @UseGuards(AccessTokenGuard, RolesGuard)
+  @Roles(UserRole.USER, UserRole.ADMIN)
+  requestEmailLink(@CurrentUser() user: AuthUser, @Body() dto: LinkEmailRequestDto) {
+    return this.authService.requestEmailLink(user, dto)
+  }
+
+  @Post('link/email/confirm')
+  @UseGuards(AccessTokenGuard, RolesGuard)
+  @Roles(UserRole.USER, UserRole.ADMIN)
+  confirmEmailLink(@CurrentUser() user: AuthUser, @Body() dto: LinkEmailConfirmDto) {
+    return this.authService.confirmEmailLink(user, dto)
   }
 }

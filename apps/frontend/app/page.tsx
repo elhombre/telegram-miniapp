@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styles from './page.module.css'
 import {
   getCurrentApiMode,
+  getLinkEmailConfirmEndpoint,
+  getLinkEmailRequestEndpoint,
   getLinkConfirmEndpoint,
   getLinkStartEndpoint,
   getLogoutEndpoint,
@@ -41,6 +43,18 @@ interface LinkStartResponse {
   linkToken: string
   expiresAt: string
 }
+
+interface LinkEmailRequestResponse {
+  sent: boolean
+  provider: 'email'
+  email: string
+  expiresAt: string
+}
+
+interface LinkConfirmResponse {
+  linked: boolean
+  provider: LinkProvider
+}
 const API_MODE = getCurrentApiMode()
 
 export default function Home() {
@@ -58,7 +72,7 @@ export default function Home() {
   const [linkToken, setLinkToken] = useState('')
   const [linkTokenExpiresAt, setLinkTokenExpiresAt] = useState<string | null>(null)
   const [linkEmail, setLinkEmail] = useState('')
-  const [linkPassword, setLinkPassword] = useState('')
+  const [linkEmailCode, setLinkEmailCode] = useState('')
   const [linkStatus, setLinkStatus] = useState<LinkActionStatus>('idle')
   const [googleLinkButtonReady, setGoogleLinkButtonReady] = useState(false)
   const [telegramLinkButtonReady, setTelegramLinkButtonReady] = useState(false)
@@ -77,6 +91,38 @@ export default function Home() {
     if (storedAuthProvider) {
       setCurrentAuthProvider(storedAuthProvider)
     }
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('link_provider') !== 'email') {
+      return
+    }
+
+    const prefilledEmail = params.get('link_email')?.trim() ?? ''
+    const prefilledCode = params.get('link_code')?.trim() ?? ''
+    const prefilledLinkToken = params.get('link_token')?.trim() ?? ''
+
+    if (prefilledEmail) {
+      setLinkEmail(prefilledEmail)
+    }
+
+    if (prefilledCode) {
+      setLinkEmailCode(prefilledCode)
+    }
+
+    if (prefilledLinkToken) {
+      setLinkToken(prefilledLinkToken)
+      setLinkTokenExpiresAt(null)
+    }
+
+    setLinkProvider('email')
+
+    if (prefilledEmail || prefilledCode) {
+      setLinkMessage('Email verification fields were prefilled from the link.')
+    }
+
+    window.history.replaceState(null, '', window.location.pathname)
   }, [])
 
   const authenticate = useCallback(async (rawInitData: string) => {
@@ -231,6 +277,63 @@ export default function Home() {
     }
   }, [linkToken, linkTokenExpiresAt])
 
+  const requestEmailLinkCode = useCallback(async () => {
+    const accessToken = authResponse?.accessToken ?? readStoredAccessToken()
+    if (!accessToken) {
+      setLinkStatus('error')
+      setLinkError('Access token is required for email linking')
+      setLinkMessage(null)
+      return
+    }
+
+    const ensuredLinkToken = await ensureLinkToken(accessToken)
+    if (!ensuredLinkToken) {
+      setLinkStatus('error')
+      setLinkMessage(null)
+      return
+    }
+
+    const trimmedEmail = linkEmail.trim()
+    if (!trimmedEmail) {
+      setLinkStatus('error')
+      setLinkError('email is required for email linking')
+      setLinkMessage(null)
+      return
+    }
+
+    setLinkStatus('loading')
+    setLinkError(null)
+    setLinkMessage(null)
+
+    try {
+      const response = await fetch(getLinkEmailRequestEndpoint(), {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          linkToken: ensuredLinkToken,
+          email: trimmedEmail,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
+      }
+
+      const payload = (await response.json()) as LinkEmailRequestResponse
+      setLinkTokenExpiresAt(payload.expiresAt)
+      setLinkStatus('success')
+      setLinkMessage(`Verification code sent to ${payload.email}.`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setLinkStatus('error')
+      setLinkError(message)
+      setLinkMessage(null)
+    }
+  }, [authResponse, ensureLinkToken, linkEmail])
+
   const confirmLink = useCallback(async (options?: { googleIdToken?: string; telegramAuthDataRaw?: string }) => {
     const accessToken = authResponse?.accessToken ?? readStoredAccessToken()
     if (!accessToken) {
@@ -249,14 +352,13 @@ export default function Home() {
 
     const payload: {
       linkToken: string
-      provider: LinkProvider
+      provider: Exclude<LinkProvider, 'email'>
       email?: string
-      password?: string
       idToken?: string
       initDataRaw?: string
     } = {
       linkToken: ensuredLinkToken,
-      provider: linkProvider,
+      provider: linkProvider === 'google' ? 'google' : 'telegram',
     }
 
     if (linkProvider === 'email') {
@@ -268,16 +370,50 @@ export default function Home() {
         return
       }
 
-      if (!linkPassword.trim()) {
+      const code = linkEmailCode.trim()
+      if (!code) {
         setLinkStatus('error')
-        setLinkError('password is required for email linking')
+        setLinkError('verification code is required for email linking')
         setLinkMessage(null)
         return
       }
 
-      payload.email = trimmedEmail
-      payload.password = linkPassword
-    } else if (linkProvider === 'google') {
+      setLinkStatus('loading')
+      setLinkError(null)
+      setLinkMessage(null)
+
+      try {
+        const response = await fetch(getLinkEmailConfirmEndpoint(), {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            linkToken: ensuredLinkToken,
+            email: trimmedEmail,
+            code,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(await parseApiError(response))
+        }
+
+        const result = (await response.json()) as LinkConfirmResponse
+        setLinkStatus('success')
+        setLinkMessage(`Linked successfully: ${result.provider}`)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setLinkStatus('error')
+        setLinkError(message)
+        setLinkMessage(null)
+      }
+
+      return
+    }
+
+    if (linkProvider === 'google') {
       const googleIdToken = options?.googleIdToken?.trim()
       if (!googleIdToken) {
         setLinkStatus('error')
@@ -326,7 +462,7 @@ export default function Home() {
       setLinkError(message)
       setLinkMessage(null)
     }
-  }, [authResponse, ensureLinkToken, initDataRaw, isInTelegram, linkEmail, linkPassword, linkProvider])
+  }, [authResponse, ensureLinkToken, initDataRaw, isInTelegram, linkEmail, linkEmailCode, linkProvider])
 
   useEffect(() => {
     if (linkProvider !== 'google') {
@@ -675,15 +811,19 @@ export default function Home() {
                     />
                   </label>
                   <label className={styles.fieldLabel}>
-                    Password
+                    Verification Code
                     <input
                       className={styles.input}
-                      type="password"
-                      value={linkPassword}
-                      onChange={event => setLinkPassword(event.target.value)}
-                      placeholder="Temporary flow: password is still required"
+                      type="text"
+                      inputMode="numeric"
+                      value={linkEmailCode}
+                      onChange={event => setLinkEmailCode(event.target.value)}
+                      placeholder="6-digit code from email"
                     />
                   </label>
+                  <span className={styles.subtitle}>
+                    In dev mode, backend logs the code as <code>auth_email_link_verification</code>.
+                  </span>
                 </>
               ) : null}
 
@@ -722,16 +862,28 @@ export default function Home() {
           {!isInTelegram && currentAuthProvider && availableLinkProviders.length > 0 ? (
             <div className={styles.actions}>
               {linkProvider === 'email' ? (
-                <button
-                  className={styles.primary}
-                  type="button"
-                  onClick={() => {
-                    void confirmLink()
-                  }}
-                  disabled={linkStatus === 'loading'}
-                >
-                  {linkStatus === 'loading' ? 'Linking...' : 'Link Provider'}
-                </button>
+                <>
+                  <button
+                    className={styles.primary}
+                    type="button"
+                    onClick={() => {
+                      void requestEmailLinkCode()
+                    }}
+                    disabled={linkStatus === 'loading'}
+                  >
+                    {linkStatus === 'loading' ? 'Sending...' : 'Send Verification Code'}
+                  </button>
+                  <button
+                    className={styles.secondary}
+                    type="button"
+                    onClick={() => {
+                      void confirmLink()
+                    }}
+                    disabled={linkStatus === 'loading'}
+                  >
+                    {linkStatus === 'loading' ? 'Linking...' : 'Confirm Code & Link'}
+                  </button>
+                </>
               ) : null}
               {linkProvider === 'telegram' ? (
                 <button className={styles.secondary} type="button" disabled>
@@ -744,7 +896,7 @@ export default function Home() {
                 type="button"
                 onClick={() => {
                   setLinkEmail('')
-                  setLinkPassword('')
+                  setLinkEmailCode('')
                   setLinkError(null)
                   setLinkMessage(null)
                   setLinkStatus('idle')

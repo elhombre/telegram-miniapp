@@ -36,12 +36,6 @@ export class LinkConfirmDto {
   email?: string
 
   @IsOptional()
-  @IsString()
-  @MinLength(8)
-  @MaxLength(128)
-  password?: string
-
-  @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>
 }
