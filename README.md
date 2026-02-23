@@ -197,11 +197,18 @@ Steps:
 5. Sign in with same credentials and confirm session card.
 6. Open `http://localhost:3100/auth/google`.
 7. Click Google sign-in button (or use manual idToken fallback) and confirm session card.
+8. Open `http://localhost:3100/` and run `Account Linking` section:
+   - choose provider
+   - for `email`: fill email + password
+   - for `google`: paste Google `idToken` (account id is extracted automatically)
+   - for `telegram`: account id is taken automatically from Telegram Mini App context
+   - click `Link Provider` (link token is generated automatically in background)
 
 Notes:
 
 - Current MVP flow does not require email delivery/verification service yet.
 - Email delivery provider is planned for verification/reset-password phase.
+- Link endpoints require bearer access token, so run linking after successful auth.
 
 ## Bot Guide (Detailed)
 

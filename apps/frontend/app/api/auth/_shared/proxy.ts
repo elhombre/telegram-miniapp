@@ -2,7 +2,15 @@ import { NextResponse } from 'next/server'
 
 const BACKEND_DEFAULT_API_BASE_URL = 'http://localhost:3000/api/v1'
 
-export async function proxyAuthPost(request: Request, authPath: string) {
+interface ProxyAuthPostOptions {
+  forwardAuthorizationHeader?: boolean
+}
+
+export async function proxyAuthPost(
+  request: Request,
+  authPath: string,
+  options: ProxyAuthPostOptions = {},
+) {
   const backendUrl = resolveBackendAuthUrl(authPath)
 
   if (!backendUrl) {
@@ -29,11 +37,20 @@ export async function proxyAuthPost(request: Request, authPath: string) {
   }
 
   try {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    }
+
+    if (options.forwardAuthorizationHeader) {
+      const authorization = request.headers.get('authorization')
+      if (authorization) {
+        headers.authorization = authorization
+      }
+    }
+
     const upstreamResponse = await fetch(backendUrl, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
+      headers,
       body: requestBodyRaw,
       cache: 'no-store',
     })

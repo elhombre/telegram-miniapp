@@ -60,6 +60,14 @@ export function readStoredRefreshToken(): string | null {
   return sessionStorage.getItem(STORAGE_KEYS.refreshToken)
 }
 
+export function readStoredAccessToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return sessionStorage.getItem(STORAGE_KEYS.accessToken)
+}
+
 export function clearAuthSession() {
   if (typeof window === 'undefined') {
     return

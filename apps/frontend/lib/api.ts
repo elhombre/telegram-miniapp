@@ -6,6 +6,8 @@ const EMAIL_LOGIN_PATH = 'email/login'
 const GOOGLE_CALLBACK_PATH = 'google/callback'
 const REFRESH_SESSION_PATH = 'refresh'
 const LOGOUT_PATH = 'logout'
+const LINK_START_PATH = 'link/start'
+const LINK_CONFIRM_PATH = 'link/confirm'
 
 export function getTelegramVerifyInitDataEndpoint(): string {
   return getAuthEndpoint(TELEGRAM_VERIFY_INIT_DATA_PATH)
@@ -29,6 +31,14 @@ export function getRefreshSessionEndpoint(): string {
 
 export function getLogoutEndpoint(): string {
   return getAuthEndpoint(LOGOUT_PATH)
+}
+
+export function getLinkStartEndpoint(): string {
+  return getAuthEndpoint(LINK_START_PATH)
+}
+
+export function getLinkConfirmEndpoint(): string {
+  return getAuthEndpoint(LINK_CONFIRM_PATH)
 }
 
 export function getCurrentApiMode(): ApiMode {
