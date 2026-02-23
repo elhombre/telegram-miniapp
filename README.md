@@ -110,25 +110,37 @@ Backend and frontend config checklist for this test:
    - `FRONTEND_ORIGIN=<public frontend origin opened in Telegram>`
      - example: `https://<frontend-tunnel>.ngrok-free.app`
 2. `apps/frontend/.env`
-   - `NEXT_PUBLIC_API_BASE_URL=<reachable backend URL>/api/v1`
-     - for phone/Telegram testing this must be public `https://`, not `http://localhost:3000`
-     - example: `https://<backend-tunnel>.ngrok-free.app/api/v1`
+   - `NEXT_PUBLIC_API_MODE=proxy|direct`
+     - default is `proxy`
+     - `proxy`: browser calls frontend route `POST /api/auth/telegram/verify-init-data`
+     - `direct`: browser calls backend URL directly
+   - `BACKEND_API_BASE_URL=<backend API base URL>/api/v1` (used in `proxy` mode by Next.js server)
+     - this value is private (not exposed to browser)
+     - local example: `http://localhost:3000/api/v1`
+   - `NEXT_PUBLIC_DIRECT_API_BASE_URL=<backend API base URL>/api/v1` (used in `direct` mode by browser)
+     - must be reachable from the client device
+     - example: `https://api.example.com/api/v1`
 
 Example local tunneling setup:
 
 ```bash
 # frontend tunnel
 ngrok http 3100
-
-# backend tunnel
-ngrok http 3000
 ```
 
 Then set:
 
 - `apps/bot/.env` -> `TELEGRAM_MINIAPP_URL=https://<frontend-tunnel>.ngrok-free.app`
 - `apps/backend/.env` -> `FRONTEND_ORIGIN=https://<frontend-tunnel>.ngrok-free.app`
-- `apps/frontend/.env` -> `NEXT_PUBLIC_API_BASE_URL=https://<backend-tunnel>.ngrok-free.app/api/v1`
+- `apps/frontend/.env` (recommended for Mini App)
+  - `NEXT_PUBLIC_API_MODE=proxy`
+  - `BACKEND_API_BASE_URL=http://localhost:3000/api/v1`
+
+Optional for standalone web frontend direct mode:
+
+- `apps/frontend/.env`
+  - `NEXT_PUBLIC_API_MODE=direct`
+  - `NEXT_PUBLIC_DIRECT_API_BASE_URL=https://<backend-public-domain>/api/v1`
 
 Steps:
 

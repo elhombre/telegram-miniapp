@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './page.module.css'
+import { getTelegramVerifyInitDataEndpoint } from '../lib/api'
 import { applyTelegramTheme, getTelegramWebApp, type TelegramWebAppUser } from '../lib/telegram'
 
 interface AuthResponse {
@@ -22,8 +23,6 @@ interface ApiErrorResponse {
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api/v1'
-
 export default function Home() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('idle')
   const [authError, setAuthError] = useState<string | null>(null)
@@ -37,7 +36,7 @@ export default function Home() {
     setAuthError(null)
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/telegram/verify-init-data`, {
+      const response = await fetch(getTelegramVerifyInitDataEndpoint(), {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
