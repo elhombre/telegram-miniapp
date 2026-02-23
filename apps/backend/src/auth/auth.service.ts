@@ -5,21 +5,23 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
 import { JwtService } from '@nestjs/jwt'
-import { IdentityProvider, type Prisma, UserRole } from '../generated/prisma/client'
+import { IdentityProvider, type Prisma, type UserRole } from '../generated/prisma/client'
 import argon2 from 'argon2'
 import type { Request } from 'express'
 import { OAuth2Client, type TokenPayload } from 'google-auth-library'
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import { getEnv } from '../config/env.schema'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
 import { PrismaService } from '../prisma/prisma.service'
-import { EmailLoginDto } from './dto/email-login.dto'
-import { EmailRegisterDto } from './dto/email-register.dto'
-import { GoogleCallbackDto } from './dto/google-callback.dto'
-import { LinkConfirmDto, LinkProviderDto } from './dto/link-confirm.dto'
-import { LogoutDto } from './dto/logout.dto'
-import { RefreshTokenDto } from './dto/refresh-token.dto'
-import { TelegramVerifyInitDataDto } from './dto/telegram-verify-init-data.dto'
+import type { EmailLoginDto } from './dto/email-login.dto'
+import type { EmailRegisterDto } from './dto/email-register.dto'
+import type { GoogleCallbackDto } from './dto/google-callback.dto'
+import { type LinkConfirmDto, LinkProviderDto } from './dto/link-confirm.dto'
+import type { LogoutDto } from './dto/logout.dto'
+import type { RefreshTokenDto } from './dto/refresh-token.dto'
+import type { TelegramVerifyInitDataDto } from './dto/telegram-verify-init-data.dto'
 import type { AuthResponse } from './types/auth-response.type'
 import type { AuthUser } from './types/auth-user.type'
 

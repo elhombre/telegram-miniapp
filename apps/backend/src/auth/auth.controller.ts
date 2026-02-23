@@ -4,13 +4,21 @@ import type { Request } from 'express'
 import { CurrentUser } from './decorators/current-user.decorator'
 import { Public } from './decorators/public.decorator'
 import { Roles } from './decorators/roles.decorator'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
 import { AuthService } from './auth.service'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { EmailLoginDto } from './dto/email-login.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { EmailRegisterDto } from './dto/email-register.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { GoogleCallbackDto } from './dto/google-callback.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { LinkConfirmDto } from './dto/link-confirm.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { LogoutDto } from './dto/logout.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { RefreshTokenDto } from './dto/refresh-token.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { TelegramVerifyInitDataDto } from './dto/telegram-verify-init-data.dto'
 import { AccessTokenGuard } from './guards/access-token.guard'
 import { RolesGuard } from './guards/roles.guard'

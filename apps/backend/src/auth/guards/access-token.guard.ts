@@ -1,10 +1,12 @@
 import {
-  CanActivate,
-  ExecutionContext,
+  type CanActivate,
+  type ExecutionContext,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
 import { JwtService } from '@nestjs/jwt'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
 import { Reflector } from '@nestjs/core'
 import { UserRole } from '../../generated/prisma/client'
 import type { Request } from 'express'

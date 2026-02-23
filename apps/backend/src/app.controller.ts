@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common'
 import type { HealthResponse } from './app.service'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
 import { AppService } from './app.service'
 
 @Controller('health')
