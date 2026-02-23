@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { AppShell } from '@/components/app/app-shell'
 import { useI18n } from '@/components/app/i18n-provider'
@@ -16,6 +17,7 @@ type SubmitStatus = 'idle' | 'loading' | 'success' | 'error'
 
 export default function LoginPage() {
   const { t } = useI18n()
+  const router = useRouter()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -82,6 +84,8 @@ export default function LoginPage() {
                 persistAuthProvider('email')
                 setSession(payload)
                 setStatus('success')
+                router.replace('/')
+                router.refresh()
               } catch (submitError) {
                 const message = submitError instanceof Error ? submitError.message : String(submitError)
                 setStatus('error')

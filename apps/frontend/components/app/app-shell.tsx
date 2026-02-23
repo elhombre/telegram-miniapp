@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SiteHeader } from './site-header'
 import type { AuthResponse } from '@/lib/auth-client'
@@ -14,8 +14,14 @@ interface AppShellProps {
 
 export function AppShell({ session, children }: AppShellProps) {
   const router = useRouter()
+  const [headerSession, setHeaderSession] = useState<AuthResponse | null>(session)
+
+  useEffect(() => {
+    setHeaderSession(session)
+  }, [session])
 
   const logout = useCallback(async () => {
+    setHeaderSession(null)
     const refreshToken = readStoredRefreshToken()
 
     if (refreshToken) {
@@ -37,13 +43,13 @@ export function AppShell({ session, children }: AppShellProps) {
     }
 
     clearAuthSession()
+    router.replace('/')
     router.refresh()
-    router.push('/')
   }, [router])
 
   return (
     <div className="min-h-screen">
-      <SiteHeader session={session} onLogout={session ? logout : undefined} />
+      <SiteHeader session={headerSession} onLogout={headerSession ? logout : undefined} />
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">{children}</main>
     </div>
   )

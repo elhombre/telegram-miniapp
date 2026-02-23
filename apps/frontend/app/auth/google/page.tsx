@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppShell } from '@/components/app/app-shell'
 import { useI18n } from '@/components/app/i18n-provider'
@@ -15,11 +16,14 @@ type SubmitStatus = 'idle' | 'loading' | 'success' | 'error'
 
 export default function GooglePage() {
   const { t } = useI18n()
+  const router = useRouter()
 
   const [status, setStatus] = useState<SubmitStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<AuthResponse | null>(null)
   const [sdkReady, setSdkReady] = useState(false)
+  const [selectedCredential, setSelectedCredential] = useState<string | null>(null)
+  const [selectedAccountLabel, setSelectedAccountLabel] = useState<string | null>(null)
   const { isInTelegram } = useTelegramMiniApp()
 
   const buttonContainerRef = useRef<HTMLDivElement | null>(null)
@@ -46,15 +50,17 @@ export default function GooglePage() {
       persistAuthProvider('google')
       setSession(payload)
       setStatus('success')
+      router.replace('/')
+      router.refresh()
     } catch (authError) {
       const message = authError instanceof Error ? authError.message : String(authError)
       setStatus('error')
       setError(message)
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
-    if (isInTelegram === true || !GOOGLE_CLIENT_ID || !buttonContainerRef.current) {
+    if (isInTelegram === true || !GOOGLE_CLIENT_ID || !buttonContainerRef.current || selectedCredential) {
       setSdkReady(false)
       return
     }
@@ -78,7 +84,11 @@ export default function GooglePage() {
       }
 
       renderGoogleSignInButton(buttonContainerRef.current, credential => {
-        void authenticate(credential)
+        const accountLabel = parseGoogleAccountLabel(credential)
+        setSelectedCredential(credential)
+        setSelectedAccountLabel(accountLabel)
+        setStatus('idle')
+        setError(null)
       })
       setSdkReady(true)
     }
@@ -91,7 +101,7 @@ export default function GooglePage() {
         buttonContainerRef.current.innerHTML = ''
       }
     }
-  }, [authenticate, isInTelegram])
+  }, [isInTelegram, selectedCredential])
 
   if (isInTelegram !== false) {
     return (
@@ -121,8 +131,15 @@ export default function GooglePage() {
           <CardDescription>{t('auth.googleSubtitle')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div ref={buttonContainerRef} className="min-h-10" />
-          {!sdkReady ? <p className="text-sm text-muted-foreground">{t('common.loading')}</p> : null}
+          {selectedCredential ? (
+            <Button className="w-full justify-start text-left" variant="outline" disabled>
+              {selectedAccountLabel ?? t('auth.googleSelectedFallback')}
+            </Button>
+          ) : (
+            <div ref={buttonContainerRef} className="min-h-10" />
+          )}
+
+          {!selectedCredential && !sdkReady ? <p className="text-sm text-muted-foreground">{t('common.loading')}</p> : null}
           {!GOOGLE_CLIENT_ID ? (
             <p className="text-sm text-destructive">Set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `apps/frontend/.env`.</p>
           ) : null}
@@ -137,15 +154,67 @@ export default function GooglePage() {
           ) : null}
 
           <div className="flex flex-wrap gap-2 pt-2">
-            <Link href="/auth/login">
-              <Button variant="outline">{t('nav.login')}</Button>
-            </Link>
-            <Link href="/auth/register">
-              <Button variant="outline">{t('nav.register')}</Button>
-            </Link>
+            <Button
+              onClick={() => {
+                if (selectedCredential && status !== 'loading') {
+                  void authenticate(selectedCredential)
+                }
+              }}
+              disabled={status === 'loading' || !selectedCredential}
+            >
+              {status === 'loading' ? t('common.loading') : t('auth.submitLogin')}
+            </Button>
+            {selectedCredential ? (
+              <Button
+                variant="outline"
+                disabled={status === 'loading'}
+                onClick={() => {
+                  setSelectedCredential(null)
+                  setSelectedAccountLabel(null)
+                  setStatus('idle')
+                  setError(null)
+                }}
+              >
+                {t('auth.googleChangeAccount')}
+              </Button>
+            ) : null}
           </div>
+
+          {!selectedCredential ? (
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+              <Link className="text-foreground underline" href="/auth/login">
+                {t('auth.loginTitle')}
+              </Link>
+              <Link className="text-foreground underline" href="/auth/register">
+                {t('auth.registerTitle')}
+              </Link>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </AppShell>
   )
+}
+
+interface GoogleTokenPayload {
+  email?: string
+  name?: string
+  given_name?: string
+}
+
+function parseGoogleAccountLabel(idToken: string): string {
+  try {
+    const [, encodedPayload] = idToken.split('.')
+    if (!encodedPayload) {
+      return ''
+    }
+
+    const normalized = encodedPayload.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=')
+    const payloadJson = atob(padded)
+    const payload = JSON.parse(payloadJson) as GoogleTokenPayload
+    return payload.email?.trim() || payload.name?.trim() || payload.given_name?.trim() || ''
+  } catch {
+    return ''
+  }
 }

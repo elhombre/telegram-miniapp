@@ -28,9 +28,9 @@ export function persistAuthSession(payload: AuthResponse) {
     return
   }
 
-  sessionStorage.setItem(STORAGE_KEYS.accessToken, payload.accessToken)
-  sessionStorage.setItem(STORAGE_KEYS.refreshToken, payload.refreshToken)
-  sessionStorage.setItem(STORAGE_KEYS.session, JSON.stringify(payload))
+  setStorageValue(STORAGE_KEYS.accessToken, payload.accessToken)
+  setStorageValue(STORAGE_KEYS.refreshToken, payload.refreshToken)
+  setStorageValue(STORAGE_KEYS.session, JSON.stringify(payload))
 }
 
 export function readStoredSession(): AuthResponse | null {
@@ -38,7 +38,7 @@ export function readStoredSession(): AuthResponse | null {
     return null
   }
 
-  const rawSession = sessionStorage.getItem(STORAGE_KEYS.session)
+  const rawSession = getStorageValue(STORAGE_KEYS.session)
   if (!rawSession) {
     return null
   }
@@ -60,7 +60,7 @@ export function readStoredRefreshToken(): string | null {
     return null
   }
 
-  return sessionStorage.getItem(STORAGE_KEYS.refreshToken)
+  return getStorageValue(STORAGE_KEYS.refreshToken)
 }
 
 export function persistAuthProvider(provider: AuthProvider) {
@@ -68,7 +68,7 @@ export function persistAuthProvider(provider: AuthProvider) {
     return
   }
 
-  sessionStorage.setItem(STORAGE_KEYS.authProvider, provider)
+  setStorageValue(STORAGE_KEYS.authProvider, provider)
 }
 
 export function readStoredAuthProvider(): AuthProvider | null {
@@ -76,7 +76,7 @@ export function readStoredAuthProvider(): AuthProvider | null {
     return null
   }
 
-  const value = sessionStorage.getItem(STORAGE_KEYS.authProvider)
+  const value = getStorageValue(STORAGE_KEYS.authProvider)
   if (value === 'telegram' || value === 'google' || value === 'email') {
     return value
   }
@@ -89,7 +89,7 @@ export function readStoredAccessToken(): string | null {
     return null
   }
 
-  return sessionStorage.getItem(STORAGE_KEYS.accessToken)
+  return getStorageValue(STORAGE_KEYS.accessToken)
 }
 
 export function clearAuthSession() {
@@ -97,10 +97,10 @@ export function clearAuthSession() {
     return
   }
 
-  sessionStorage.removeItem(STORAGE_KEYS.accessToken)
-  sessionStorage.removeItem(STORAGE_KEYS.refreshToken)
-  sessionStorage.removeItem(STORAGE_KEYS.session)
-  sessionStorage.removeItem(STORAGE_KEYS.authProvider)
+  removeStorageValue(STORAGE_KEYS.accessToken)
+  removeStorageValue(STORAGE_KEYS.refreshToken)
+  removeStorageValue(STORAGE_KEYS.session)
+  removeStorageValue(STORAGE_KEYS.authProvider)
 }
 
 export async function parseApiError(response: Response): Promise<string> {
@@ -126,4 +126,47 @@ export function maskToken(value: string): string {
   }
 
   return `${value.slice(0, 8)}...${value.slice(-8)}`
+}
+
+function setStorageValue(key: string, value: string) {
+  for (const storage of getWritableStorages()) {
+    try {
+      storage.setItem(key, value)
+    } catch {
+      // Best effort persistence: ignore storage write errors.
+    }
+  }
+}
+
+function getStorageValue(key: string): string | null {
+  for (const storage of getReadableStorages()) {
+    try {
+      const value = storage.getItem(key)
+      if (value) {
+        return value
+      }
+    } catch {
+      // Ignore storage read errors and fallback to the next storage.
+    }
+  }
+
+  return null
+}
+
+function removeStorageValue(key: string) {
+  for (const storage of getWritableStorages()) {
+    try {
+      storage.removeItem(key)
+    } catch {
+      // Best effort cleanup: ignore storage remove errors.
+    }
+  }
+}
+
+function getReadableStorages(): Storage[] {
+  return [window.sessionStorage, window.localStorage]
+}
+
+function getWritableStorages(): Storage[] {
+  return [window.sessionStorage, window.localStorage]
 }

@@ -29,7 +29,9 @@ export function SiteHeader({ session, onLogout }: SiteHeaderProps) {
   return (
     <header className="border-b">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
-        <span className="text-sm font-semibold">{t('app.name')}</span>
+        <Link href="/" className="text-sm font-semibold transition-opacity hover:opacity-80">
+          {t('app.name')}
+        </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
           {navItems.map(item => {

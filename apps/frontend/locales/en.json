@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Miniapp Hub"
+    "name": "Demo"
   },
   "language": {
     "label": "Language",
@@ -11,7 +11,9 @@
     "label": "Theme",
     "light": "Light",
     "dark": "Dark",
-    "system": "System"
+    "system": "System",
+    "toggle": "Theme: {{current}}. Next: {{next}}.",
+    "toggleWithResolved": "Theme: {{current}} (now {{resolved}}). Next: {{next}}."
   },
   "nav": {
     "welcome": "Welcome",
@@ -87,6 +89,8 @@
     "registerSubtitle": "Register a new account for web access.",
     "googleTitle": "Google sign-in",
     "googleSubtitle": "Continue with your Google account.",
+    "googleChangeAccount": "Choose another account",
+    "googleSelectedFallback": "Selected Google account",
     "browserOnlyTitle": "This action is browser-only",
     "browserOnlyDescription": "Email and Google auth are available only in a regular browser. In Telegram mini app, authorization runs automatically via Telegram.",
     "submitLogin": "Sign in",

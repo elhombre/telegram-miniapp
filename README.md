@@ -205,17 +205,21 @@ Steps:
 
 1. Open `http://localhost:3100/auth/register`.
 2. Register with email and password (min length 8).
-3. Confirm success message and session card.
+3. Confirm app redirects to `http://localhost:3100/` and session is active.
 4. Open `http://localhost:3100/auth/login`.
-5. Sign in with same credentials and confirm session card.
+5. Sign in with same credentials and confirm app redirects to `http://localhost:3100/`.
 6. Open `http://localhost:3100/auth/google`.
-7. Click Google sign-in button (or use manual idToken fallback) and confirm session card.
-8. Open `http://localhost:3100/dashboard/linking` and run account linking:
+7. Click Google sign-in button and select account.
+8. Confirm selected account is shown on the page, then click `Sign in`.
+9. Confirm app redirects to `http://localhost:3100/` and session is active.
+10. Open `http://localhost:3100/dashboard` and confirm provider/session info is shown.
+11. Open `http://localhost:3100/dashboard/linking` and run account linking:
    - linking is available only in standalone browser (disabled inside Telegram Mini App)
    - available providers depend on current sign-in provider:
      - signed in with `google`: `email`, `telegram`
      - signed in with `email`: `google`, `telegram`
-   - `google`: click Google sign-in button inside linking section (linking starts automatically)
+     - signed in with `telegram`: `email`, `google`
+   - `google`: click Google button in linking section and select account (link request is sent automatically)
    - `email`: fill email, click `Send Verification Code`, then enter 6-digit code and click `Confirm Code & Link`
    - `telegram`: click Telegram Login Widget button inside linking section
 
@@ -229,11 +233,13 @@ Notes:
 ## UI Baseline
 
 - Welcome page is shared for Telegram Mini App and regular browser.
+- Header brand label is `Demo`; click it to navigate to `/`.
 - Browser mode uses dashboard sidebar navigation with toggle.
 - Telegram mode uses compact in-page menu for dashboard sections.
 - UI stack is based on shadcn/ui components.
-- Themes: `light`, `dark`, `system`.
+- Theme switcher is a 3-state button: `light -> dark -> system -> light`.
 - i18n: `en` and `ru`, with locale JSON dictionaries.
+- In Telegram Mini App, web auth actions (`Sign in`, `Create account`, provider linking page/actions) are hidden/disabled by design.
 
 ## Bot Guide (Detailed)
 

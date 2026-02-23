@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Miniapp Hub"
+    "name": "Demo"
   },
   "language": {
     "label": "Язык",
@@ -11,7 +11,9 @@
     "label": "Тема",
     "light": "Светлая",
     "dark": "Тёмная",
-    "system": "Системная"
+    "system": "Системная",
+    "toggle": "Тема: {{current}}. Следующая: {{next}}.",
+    "toggleWithResolved": "Тема: {{current}} (сейчас {{resolved}}). Следующая: {{next}}."
   },
   "nav": {
     "welcome": "Главная",
@@ -87,6 +89,8 @@
     "registerSubtitle": "Зарегистрируйте аккаунт для web-доступа.",
     "googleTitle": "Вход через Google",
     "googleSubtitle": "Продолжить с аккаунтом Google.",
+    "googleChangeAccount": "Выбрать другой аккаунт",
+    "googleSelectedFallback": "Выбранный Google аккаунт",
     "browserOnlyTitle": "Это действие доступно только в браузере",
     "browserOnlyDescription": "Email и Google авторизация доступны только в обычном браузере. В Telegram mini app авторизация выполняется автоматически через Telegram.",
     "submitLogin": "Войти",

@@ -16,7 +16,7 @@ interface UseTelegramMiniAppResult {
 
 const DEFAULT_MAX_ATTEMPTS = 20
 const DEFAULT_INTERVAL_MS = 150
-const QUICK_BOOTSTRAP_ATTEMPTS = 6
+const QUICK_BOOTSTRAP_ATTEMPTS = 2
 
 export function useTelegramMiniApp(options: UseTelegramMiniAppOptions = {}): UseTelegramMiniAppResult {
   const waitForSignedData = options.waitForSignedData ?? false

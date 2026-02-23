@@ -9,25 +9,13 @@ export interface TelegramRuntimeContext {
 }
 
 export function readTelegramRuntimeContext(): TelegramRuntimeContext {
-  const hasTelegramUrlHints = detectTelegramUrlHints()
+  const { hasTelegramUrlHints, hintedInitDataRaw } = readTelegramUrlHints()
   const webApp = getTelegramWebApp()
-  if (!webApp) {
-    return {
-      isInTelegram: false,
-      hasSignedAuthData: false,
-      hasTelegramUrlHints,
-      initDataRaw: '',
-    }
-  }
+  const initDataRaw = ((webApp?.initData ?? '').trim() || hintedInitDataRaw).trim()
+  const hasSignedPayload = hasSignedPayloadInInitData(initDataRaw)
+  const isInTelegram = hasSignedPayload || (hasTelegramUrlHints && Boolean(webApp))
 
-  const initDataRaw = (webApp.initData ?? '').trim()
-  const hasUserId = Boolean(webApp.initDataUnsafe.user?.id)
-  const hasQueryId = Boolean(webApp.initDataUnsafe.query_id)
-  const hasHash = Boolean(webApp.initDataUnsafe.hash)
-  const hasSignedPayload = initDataRaw.length > 0 && (hasUserId || hasQueryId || hasHash)
-  const isInTelegram = hasSignedPayload
-
-  if (hasSignedPayload) {
+  if (webApp && hasSignedPayload) {
     webApp.ready()
     webApp.expand()
     applyTelegramTheme(webApp.themeParams)
@@ -42,16 +30,47 @@ export function readTelegramRuntimeContext(): TelegramRuntimeContext {
   }
 }
 
-function detectTelegramUrlHints(): boolean {
+function readTelegramUrlHints(): { hasTelegramUrlHints: boolean; hintedInitDataRaw: string } {
   if (typeof window === 'undefined') {
-    return false
+    return {
+      hasTelegramUrlHints: false,
+      hintedInitDataRaw: '',
+    }
   }
 
   const searchParams = new URLSearchParams(window.location.search)
   if (searchParams.has('tgWebAppPlatform') || searchParams.has('tgWebAppData')) {
-    return true
+    return {
+      hasTelegramUrlHints: true,
+      hintedInitDataRaw: (searchParams.get('tgWebAppData') ?? '').trim(),
+    }
   }
 
-  const hash = window.location.hash
-  return hash.includes('tgWebAppPlatform') || hash.includes('tgWebAppData')
+  const hash = window.location.hash.replace(/^#/, '')
+  if (!hash) {
+    return {
+      hasTelegramUrlHints: false,
+      hintedInitDataRaw: '',
+    }
+  }
+
+  const hashParams = new URLSearchParams(hash)
+  const hasTelegramUrlHints = hashParams.has('tgWebAppPlatform') || hashParams.has('tgWebAppData')
+  const hintedInitDataRaw = (hashParams.get('tgWebAppData') ?? '').trim()
+  return {
+    hasTelegramUrlHints,
+    hintedInitDataRaw,
+  }
+}
+
+function hasSignedPayloadInInitData(initDataRaw: string): boolean {
+  if (!initDataRaw) {
+    return false
+  }
+
+  const initParams = new URLSearchParams(initDataRaw)
+  const hasUserId = Boolean(initParams.get('user'))
+  const hasQueryId = Boolean(initParams.get('query_id'))
+  const hasHash = Boolean(initParams.get('hash'))
+  return hasHash && (hasUserId || hasQueryId)
 }

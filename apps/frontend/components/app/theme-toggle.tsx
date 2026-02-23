@@ -1,29 +1,95 @@
 'use client'
 
-import { Moon, Sun } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Monitor, Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useI18n } from './i18n-provider'
 
+type ThemeMode = 'light' | 'dark' | 'system'
+
 export function ThemeToggle() {
-  const { setTheme } = useTheme()
+  const { theme, resolvedTheme, setTheme } = useTheme()
   const { t } = useI18n()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <Button variant="outline" size="icon" className="h-8 w-8" aria-label={t('theme.label')} title={t('theme.label')}>
+        <Monitor className="h-4 w-4" />
+        <span className="sr-only">{t('theme.label')}</span>
+      </Button>
+    )
+  }
+
+  const currentTheme = toThemeMode(theme)
+  const nextTheme = getNextTheme(currentTheme)
+
+  const currentThemeLabel = t(`theme.${currentTheme}`)
+  const nextThemeLabel = t(`theme.${nextTheme}`)
+  const resolvedThemeLabel = t(`theme.${toThemeMode(resolvedTheme)}`)
+
+  const label =
+    currentTheme === 'system'
+      ? t('theme.toggleWithResolved', {
+          current: currentThemeLabel,
+          resolved: resolvedThemeLabel,
+          next: nextThemeLabel,
+        })
+      : t('theme.toggle', {
+          current: currentThemeLabel,
+          next: nextThemeLabel,
+        })
+
+  const Icon = getThemeIcon(currentTheme)
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="h-8 w-8">
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">{t('theme.label')}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme('light')}>{t('theme.light')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('dark')}>{t('theme.dark')}</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('system')}>{t('theme.system')}</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant="outline"
+      size="icon"
+      className="h-8 w-8"
+      onClick={() => setTheme(nextTheme)}
+      aria-label={label}
+      title={label}
+    >
+      <Icon className="h-4 w-4" />
+      <span className="sr-only">{label}</span>
+    </Button>
   )
+}
+
+function toThemeMode(value: string | undefined): ThemeMode {
+  if (value === 'light' || value === 'dark' || value === 'system') {
+    return value
+  }
+
+  return 'system'
+}
+
+function getNextTheme(currentTheme: ThemeMode): ThemeMode {
+  if (currentTheme === 'light') {
+    return 'dark'
+  }
+
+  if (currentTheme === 'dark') {
+    return 'system'
+  }
+
+  return 'light'
+}
+
+function getThemeIcon(currentTheme: ThemeMode) {
+  if (currentTheme === 'light') {
+    return Sun
+  }
+
+  if (currentTheme === 'dark') {
+    return Moon
+  }
+
+  return Monitor
 }
