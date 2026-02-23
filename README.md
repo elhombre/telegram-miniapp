@@ -60,14 +60,21 @@ cp apps/bot/.env.example apps/bot/.env
     - `MAILERLITE_TOKEN=<your_mailerlite_token>`
     - `EMAIL_FROM_EMAIL=<verified_sender_email>`
     - `EMAIL_FROM_NAME=<sender_name>`
+  - optional distributed rate limiting:
+    - `RATE_LIMIT_ENABLED=true`
+    - `REDIS_URL=redis://<user>:<password>@<host>:<port>/<db>` (or `rediss://...`)
+    - Works with any Redis-compatible backend, including Upstash Redis endpoint and Aiven Valkey.
+    - local docker-compose defaults:
+      - root `.env`: `REDIS_PASSWORD=redis`
+      - backend `.env`: `REDIS_URL=redis://:redis@localhost:6379/0`
 - `apps/bot/.env`
   - `TELEGRAM_BOT_TOKEN`
   - `TELEGRAM_MINIAPP_URL`
 
-4. Start Postgres.
+4. Start local infrastructure services.
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres redis
 ```
 
 5. Apply database migrations.
@@ -229,6 +236,9 @@ Notes:
 - `EMAIL_PROVIDER=console` logs verification payload as `auth_email_link_verification`.
 - `EMAIL_PROVIDER=mailerlite` sends verification email through MailerLite API.
 - Link endpoints require bearer access token, so run linking after successful auth.
+- Auth/link endpoints are rate-limited on backend.
+  - if `REDIS_URL` is configured, shared counters are stored in Redis
+  - if Redis is unavailable (or `REDIS_URL` is empty), backend falls back to in-memory counters and logs warning
 
 ## UI Baseline
 
@@ -410,6 +420,11 @@ yarn workspace bot dev:webhook
   - Check `TELEGRAM_WEBHOOK_SECRET` and forwarded header `x-telegram-bot-api-secret-token`.
 - Backend DB issues.
   - Re-run compose + migrations and verify tables. See `../docs/runbooks/backend-phase1-db-verification.md`.
+- Rate limiting with Redis seems inactive.
+  - Ensure `RATE_LIMIT_ENABLED=true` and `REDIS_URL` is configured.
+  - Ensure backend startup logs include `rate_limit_store_selected` with `provider=redis`.
+  - Verify keys exist in Redis after repeated auth attempts:
+    - `redis-cli -u "$REDIS_URL" --scan --pattern "rl:*"`
 
 ## Development Process
 

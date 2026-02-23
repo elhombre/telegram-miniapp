@@ -4,6 +4,7 @@ import { UserRole, type IdentityProvider } from './mocks/prisma-client.mock'
 import request from 'supertest'
 import { AppModule } from '../src/app.module'
 import { EmailSenderService, type EmailLinkVerificationPayload } from '../src/auth/email-sender.service'
+import { ApiExceptionFilter } from '../src/common/http/api-exception.filter'
 import { PrismaService } from '../src/prisma/prisma.service'
 
 type JsonObject = Record<string, unknown>
@@ -401,6 +402,7 @@ describe('AuthController (e2e)', () => {
         forbidNonWhitelisted: true,
       }),
     )
+    app.useGlobalFilters(new ApiExceptionFilter())
     await app.init()
   })
 
@@ -488,5 +490,39 @@ describe('AuthController (e2e)', () => {
       code: 'MISSING_ACCESS_TOKEN',
       message: 'Missing bearer access token',
     })
+  })
+
+  it('returns 429 when email login attempts exceed rate limit', async () => {
+    const email = 'rate-limit-user@example.com'
+    const password = 'StrongPass123'
+
+    const registerResponse = await request(app.getHttpServer()).post('/api/v1/auth/email/register').send({
+      email,
+      password,
+    })
+
+    expect(registerResponse.status).toBe(201)
+
+    for (let index = 0; index < 5; index += 1) {
+      const response = await request(app.getHttpServer()).post('/api/v1/auth/email/login').send({
+        email,
+        password: 'WrongPass123',
+      })
+
+      expect(response.status).toBe(401)
+      expect(response.body.code).toBe('INVALID_CREDENTIALS')
+    }
+
+    const limitedResponse = await request(app.getHttpServer()).post('/api/v1/auth/email/login').send({
+      email,
+      password: 'WrongPass123',
+    })
+
+    expect(limitedResponse.status).toBe(429)
+    expect(limitedResponse.body).toMatchObject({
+      code: 'RATE_LIMIT_EXCEEDED',
+      message: 'Too many requests. Please try again later.',
+    })
+    expect(Number(limitedResponse.headers['retry-after'])).toBeGreaterThan(0)
   })
 })

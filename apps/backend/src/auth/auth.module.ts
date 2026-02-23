@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
+import { RateLimitModule } from '../common/rate-limit/rate-limit.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { ConsoleEmailSenderProvider } from './email/console-email-sender.provider'
@@ -9,7 +10,7 @@ import { AccessTokenGuard } from './guards/access-token.guard'
 import { RolesGuard } from './guards/roles.guard'
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), RateLimitModule],
   controllers: [AuthController],
   providers: [
     AuthService,

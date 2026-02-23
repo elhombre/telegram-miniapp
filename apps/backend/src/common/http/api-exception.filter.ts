@@ -53,6 +53,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
       traceId,
     }
 
+    const retryAfterSeconds = this.extractRetryAfterSeconds(payload.statusCode, payload.details)
+    if (retryAfterSeconds !== undefined) {
+      response.setHeader('Retry-After', String(retryAfterSeconds))
+    }
+
     response.status(payload.statusCode).json(responseBody)
   }
 
@@ -135,5 +140,18 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     return details
+  }
+
+  private extractRetryAfterSeconds(statusCode: number, details: unknown): number | undefined {
+    if (statusCode !== HttpStatus.TOO_MANY_REQUESTS || !details || typeof details !== 'object') {
+      return undefined
+    }
+
+    const retryAfterRaw = (details as { retryAfterSeconds?: unknown }).retryAfterSeconds
+    if (typeof retryAfterRaw !== 'number' || !Number.isFinite(retryAfterRaw) || retryAfterRaw <= 0) {
+      return undefined
+    }
+
+    return Math.max(1, Math.ceil(retryAfterRaw))
   }
 }

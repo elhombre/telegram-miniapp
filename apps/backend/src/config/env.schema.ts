@@ -1,6 +1,7 @@
 export type NodeEnv = 'development' | 'test' | 'production'
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 export type EmailProvider = 'console' | 'mailerlite'
+export type RateLimitProvider = 'memory' | 'redis'
 
 export interface AppEnv {
   NODE_ENV: NodeEnv
@@ -21,6 +22,8 @@ export interface AppEnv {
   EMAIL_FROM_EMAIL?: string
   EMAIL_FROM_NAME: string
   MAILERLITE_TOKEN?: string
+  RATE_LIMIT_ENABLED: boolean
+  REDIS_URL?: string
 }
 
 let cachedEnv: AppEnv | undefined
@@ -32,6 +35,7 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
 
   const errors: string[] = []
   const mailerLiteToken = parseOptionalString(rawEnv.MAILERLITE_TOKEN)
+  const redisUrl = parseOptionalRedisUrl(rawEnv.REDIS_URL, 'REDIS_URL', errors)
   const emailProviderFallback: EmailProvider = mailerLiteToken ? 'mailerlite' : 'console'
 
   const env: AppEnv = {
@@ -74,6 +78,8 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
     EMAIL_FROM_EMAIL: parseOptionalEmail(rawEnv.EMAIL_FROM_EMAIL, 'EMAIL_FROM_EMAIL', errors),
     EMAIL_FROM_NAME: parseNonEmptyString(rawEnv.EMAIL_FROM_NAME, 'EMAIL_FROM_NAME', 'Telegram Miniapp', errors),
     MAILERLITE_TOKEN: mailerLiteToken,
+    RATE_LIMIT_ENABLED: parseBoolean(rawEnv.RATE_LIMIT_ENABLED, 'RATE_LIMIT_ENABLED', true, errors),
+    REDIS_URL: redisUrl,
   }
 
   if (env.EMAIL_PROVIDER === 'mailerlite') {
@@ -95,6 +101,29 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   return env
+}
+
+function parseBoolean(
+  rawValue: string | undefined,
+  variableName: string,
+  fallback: boolean,
+  errors: string[],
+): boolean {
+  if (!rawValue) {
+    return fallback
+  }
+
+  const value = rawValue.trim().toLowerCase()
+  if (value === 'true' || value === '1' || value === 'yes') {
+    return true
+  }
+
+  if (value === 'false' || value === '0' || value === 'no') {
+    return false
+  }
+
+  errors.push(`${variableName} must be a boolean, got "${rawValue}"`)
+  return fallback
 }
 
 function parsePort(rawValue: string | undefined, errors: string[]): number {
@@ -138,6 +167,29 @@ function parseOptionalUrl(
     return parsedUrl.toString().replace(/\/$/, '')
   } catch {
     errors.push(`${variableName} must be a valid URL, got "${rawValue}"`)
+    return undefined
+  }
+}
+
+function parseOptionalRedisUrl(
+  rawValue: string | undefined,
+  variableName: string,
+  errors: string[],
+): string | undefined {
+  if (!rawValue || !rawValue.trim()) {
+    return undefined
+  }
+
+  try {
+    const parsedUrl = new URL(rawValue)
+    if (parsedUrl.protocol !== 'redis:' && parsedUrl.protocol !== 'rediss:') {
+      errors.push(`${variableName} must use redis:// or rediss:// protocol, got "${rawValue}"`)
+      return undefined
+    }
+
+    return rawValue.trim()
+  } catch {
+    errors.push(`${variableName} must be a valid redis URL, got "${rawValue}"`)
     return undefined
   }
 }
