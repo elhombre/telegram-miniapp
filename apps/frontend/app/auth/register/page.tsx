@@ -4,7 +4,14 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import styles from '../auth.module.css'
 import { getCurrentApiMode, getEmailRegisterEndpoint } from '../../../lib/api'
-import { type AuthResponse, maskToken, parseApiError, persistAuthSession, readStoredSession } from '../../../lib/auth-client'
+import {
+  type AuthResponse,
+  maskToken,
+  parseApiError,
+  persistAuthProvider,
+  persistAuthSession,
+  readStoredSession,
+} from '../../../lib/auth-client'
 
 type SubmitStatus = 'idle' | 'loading' | 'success' | 'error'
 
@@ -75,6 +82,7 @@ export default function RegisterPage() {
 
               const payload = (await response.json()) as AuthResponse
               persistAuthSession(payload)
+              persistAuthProvider('email')
               setSession(payload)
               setStatus('success')
             } catch (submitError) {

@@ -4,13 +4,19 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import styles from '../auth.module.css'
 import { getCurrentApiMode, getGoogleCallbackEndpoint } from '../../../lib/api'
-import { type AuthResponse, maskToken, parseApiError, persistAuthSession, readStoredSession } from '../../../lib/auth-client'
+import {
+  type AuthResponse,
+  maskToken,
+  parseApiError,
+  persistAuthProvider,
+  persistAuthSession,
+  readStoredSession,
+} from '../../../lib/auth-client'
+import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '../../../lib/google-identity'
 
 type SubmitStatus = 'idle' | 'loading' | 'success' | 'error'
 
 const API_MODE = getCurrentApiMode()
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? ''
-const GOOGLE_SDK_SCRIPT_ID = 'google-identity-services-sdk'
 
 export default function GooglePage() {
   const [status, setStatus] = useState<SubmitStatus>('idle')
@@ -41,6 +47,7 @@ export default function GooglePage() {
 
       const payload = (await response.json()) as AuthResponse
       persistAuthSession(payload)
+      persistAuthProvider('google')
       setSession(payload)
       setStatus('success')
     } catch (submitError) {
@@ -77,30 +84,13 @@ export default function GooglePage() {
         return
       }
 
-      if (isCancelled || !window.google?.accounts?.id || !buttonContainerRef.current) {
+      if (isCancelled || !buttonContainerRef.current) {
         return
       }
 
-      buttonContainerRef.current.innerHTML = ''
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: response => {
-          const credential = response.credential?.trim()
-          if (!credential) {
-            setStatus('error')
-            setError('Google did not return idToken credential')
-            return
-          }
-
-          setManualIdToken(credential)
-          void authenticateWithGoogleToken(credential)
-        },
-      })
-      window.google.accounts.id.renderButton(buttonContainerRef.current, {
-        theme: 'outline',
-        size: 'large',
-        text: 'signin_with',
-        shape: 'pill',
+      renderGoogleSignInButton(buttonContainerRef.current, credential => {
+        setManualIdToken(credential)
+        void authenticateWithGoogleToken(credential)
       })
       setSdkReady(true)
     }
@@ -200,79 +190,4 @@ export default function GooglePage() {
       </main>
     </div>
   )
-}
-
-function loadGoogleIdentityScript(): Promise<void> {
-  if (window.google?.accounts?.id) {
-    return Promise.resolve()
-  }
-
-  const existingScript = document.getElementById(GOOGLE_SDK_SCRIPT_ID) as HTMLScriptElement | null
-  if (existingScript) {
-    return waitForGoogleObject()
-  }
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.id = GOOGLE_SDK_SCRIPT_ID
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    script.onload = () => {
-      void waitForGoogleObject().then(resolve).catch(reject)
-    }
-    script.onerror = () => reject(new Error('Failed to load Google Identity Services SDK'))
-    document.head.appendChild(script)
-  })
-}
-
-function waitForGoogleObject(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let attempts = 0
-    const maxAttempts = 60
-
-    const intervalId = window.setInterval(() => {
-      attempts += 1
-      if (window.google?.accounts?.id) {
-        window.clearInterval(intervalId)
-        resolve()
-        return
-      }
-
-      if (attempts >= maxAttempts) {
-        window.clearInterval(intervalId)
-        reject(new Error('Google Identity Services SDK is loaded but unavailable'))
-      }
-    }, 50)
-  })
-}
-
-declare global {
-  interface Window {
-    google?: GoogleIdentityWindow
-  }
-}
-
-interface GoogleIdentityWindow {
-  accounts?: {
-    id?: {
-      initialize: (options: {
-        client_id: string
-        callback: (response: GoogleCredentialResponse) => void
-      }) => void
-      renderButton: (
-        parent: HTMLElement,
-        options: {
-          theme?: 'outline' | 'filled_blue' | 'filled_black'
-          size?: 'small' | 'medium' | 'large'
-          text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
-          shape?: 'rectangular' | 'pill' | 'circle' | 'square'
-        },
-      ) => void
-    }
-  }
-}
-
-interface GoogleCredentialResponse {
-  credential?: string
 }

@@ -152,38 +152,7 @@ export class AuthService {
   }
 
   async loginWithGoogle(dto: GoogleCallbackDto, request: Request): Promise<AuthResponse> {
-    if (!this.env.GOOGLE_CLIENT_ID) {
-      throw new ServiceUnavailableException({
-        code: 'GOOGLE_AUTH_DISABLED',
-        message: 'Google auth is not configured',
-      })
-    }
-
-    if (!this.googleClient) {
-      this.googleClient = new OAuth2Client(this.env.GOOGLE_CLIENT_ID)
-    }
-
-    let payload: TokenPayload | undefined
-
-    try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: dto.idToken,
-        audience: this.env.GOOGLE_CLIENT_ID,
-      })
-      payload = ticket.getPayload()
-    } catch {
-      throw new UnauthorizedException({
-        code: 'INVALID_GOOGLE_TOKEN',
-        message: 'Google token is invalid',
-      })
-    }
-
-    if (!payload?.sub) {
-      throw new UnauthorizedException({
-        code: 'INVALID_GOOGLE_TOKEN',
-        message: 'Google token payload is invalid',
-      })
-    }
+    const payload = await this.verifyGoogleIdToken(dto.idToken)
 
     const existingGoogleIdentity = await this.prisma.identity.findUnique({
       where: {
@@ -439,10 +408,45 @@ export class AuthService {
     }
 
     const provider = this.mapLinkProvider(dto.provider)
-    const normalizedEmail = dto.email ? this.normalizeEmail(dto.email) : undefined
+    let normalizedEmail = dto.email ? this.normalizeEmail(dto.email) : undefined
+    let verifiedProviderUserId: string | undefined
+    let providerMetadata: Record<string, unknown> | undefined
 
-    const providerUserId = this.resolveProviderUserId(dto.provider, dto.providerUserId, normalizedEmail)
+    if (dto.provider === LinkProviderDto.google && dto.idToken?.trim()) {
+      const payload = await this.verifyGoogleIdToken(dto.idToken)
+      verifiedProviderUserId = payload.sub
+      if (!normalizedEmail && payload.email) {
+        normalizedEmail = this.normalizeEmail(payload.email)
+      }
+
+      providerMetadata = {
+        name: payload.name,
+        picture: payload.picture,
+        locale: payload.locale,
+        emailVerified: payload.email_verified,
+      }
+    }
+
+    if (dto.provider === LinkProviderDto.telegram && dto.initDataRaw?.trim()) {
+      const telegramUser = this.verifyTelegramInitData(dto.initDataRaw)
+      verifiedProviderUserId = String(telegramUser.id)
+      providerMetadata = {
+        username: telegramUser.username,
+        firstName: telegramUser.first_name,
+        lastName: telegramUser.last_name,
+        languageCode: telegramUser.language_code,
+        isPremium: telegramUser.is_premium,
+      }
+    }
+
+    const providerUserId = this.resolveProviderUserId(
+      dto.provider,
+      dto.providerUserId,
+      normalizedEmail,
+      verifiedProviderUserId,
+    )
     const passwordHash = await this.resolvePasswordHash(dto)
+    const mergedMetadata = this.mergeLinkMetadata(dto.metadata, providerMetadata)
 
     const existingIdentity = await this.prisma.identity.findUnique({
       where: {
@@ -471,7 +475,7 @@ export class AuthService {
           providerUserId,
           email: normalizedEmail,
           passwordHash,
-          metadata: dto.metadata as Prisma.InputJsonValue | undefined,
+          metadata: mergedMetadata as Prisma.InputJsonValue | undefined,
           user: {
             connect: { id: user.userId },
           },
@@ -583,6 +587,7 @@ export class AuthService {
     provider: LinkProviderDto,
     providerUserId: string | undefined,
     normalizedEmail: string | undefined,
+    verifiedProviderUserId: string | undefined,
   ): string {
     if (provider === LinkProviderDto.email) {
       if (!normalizedEmail) {
@@ -595,10 +600,14 @@ export class AuthService {
       return normalizedEmail
     }
 
+    if (verifiedProviderUserId?.trim()) {
+      return verifiedProviderUserId.trim()
+    }
+
     if (!providerUserId?.trim()) {
       throw new BadRequestException({
         code: 'PROVIDER_USER_ID_REQUIRED',
-        message: 'providerUserId is required for this provider',
+        message: 'providerUserId or provider auth payload is required for this provider',
       })
     }
 
@@ -618,6 +627,57 @@ export class AuthService {
     }
 
     return argon2.hash(dto.password)
+  }
+
+  private async verifyGoogleIdToken(idToken: string): Promise<TokenPayload> {
+    if (!this.env.GOOGLE_CLIENT_ID) {
+      throw new ServiceUnavailableException({
+        code: 'GOOGLE_AUTH_DISABLED',
+        message: 'Google auth is not configured',
+      })
+    }
+
+    if (!this.googleClient) {
+      this.googleClient = new OAuth2Client(this.env.GOOGLE_CLIENT_ID)
+    }
+
+    let payload: TokenPayload | undefined
+
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: this.env.GOOGLE_CLIENT_ID,
+      })
+      payload = ticket.getPayload()
+    } catch {
+      throw new UnauthorizedException({
+        code: 'INVALID_GOOGLE_TOKEN',
+        message: 'Google token is invalid',
+      })
+    }
+
+    if (!payload?.sub) {
+      throw new UnauthorizedException({
+        code: 'INVALID_GOOGLE_TOKEN',
+        message: 'Google token payload is invalid',
+      })
+    }
+
+    return payload
+  }
+
+  private mergeLinkMetadata(
+    inputMetadata: Record<string, unknown> | undefined,
+    providerMetadata: Record<string, unknown> | undefined,
+  ): Record<string, unknown> | undefined {
+    if (!inputMetadata && !providerMetadata) {
+      return undefined
+    }
+
+    return {
+      ...(inputMetadata ?? {}),
+      ...(providerMetadata ?? {}),
+    }
   }
 
   private verifyTelegramInitData(initDataRaw: string): TelegramUser {

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styles from './page.module.css'
 import {
   getCurrentApiMode,
@@ -12,15 +12,19 @@ import {
   getTelegramVerifyInitDataEndpoint,
 } from '../lib/api'
 import {
+  type AuthProvider,
   clearAuthSession,
   type AuthResponse,
   maskToken,
   parseApiError,
+  persistAuthProvider,
   persistAuthSession,
   readStoredAccessToken,
+  readStoredAuthProvider,
   readStoredRefreshToken,
   readStoredSession,
 } from '../lib/auth-client'
+import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '../lib/google-identity'
 import { applyTelegramTheme, getTelegramWebApp, type TelegramWebAppUser } from '../lib/telegram'
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error'
@@ -44,20 +48,27 @@ export default function Home() {
   const [isInTelegram, setIsInTelegram] = useState(false)
   const [initDataRaw, setInitDataRaw] = useState<string>('')
   const [telegramUser, setTelegramUser] = useState<TelegramWebAppUser | null>(null)
+  const [currentAuthProvider, setCurrentAuthProvider] = useState<AuthProvider | null>(null)
   const [linkProvider, setLinkProvider] = useState<LinkProvider>('email')
   const [linkToken, setLinkToken] = useState('')
   const [linkTokenExpiresAt, setLinkTokenExpiresAt] = useState<string | null>(null)
   const [linkEmail, setLinkEmail] = useState('')
   const [linkPassword, setLinkPassword] = useState('')
-  const [linkGoogleIdToken, setLinkGoogleIdToken] = useState('')
   const [linkStatus, setLinkStatus] = useState<LinkActionStatus>('idle')
+  const [googleLinkButtonReady, setGoogleLinkButtonReady] = useState(false)
   const [linkMessage, setLinkMessage] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
+  const googleLinkButtonRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const storedSession = readStoredSession()
+    const storedAuthProvider = readStoredAuthProvider()
+
     if (storedSession) {
       setAuthResponse(storedSession)
+    }
+    if (storedAuthProvider) {
+      setCurrentAuthProvider(storedAuthProvider)
     }
   }, [])
 
@@ -83,6 +94,8 @@ export default function Home() {
       const payload = (await response.json()) as AuthResponse
       setAuthResponse(payload)
       persistAuthSession(payload)
+      persistAuthProvider('telegram')
+      setCurrentAuthProvider('telegram')
       setAuthStatus('success')
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -142,6 +155,7 @@ export default function Home() {
     if (!refreshToken) {
       clearAuthSession()
       setAuthResponse(null)
+      setCurrentAuthProvider(null)
       setAuthStatus('idle')
       setAuthError(null)
       setSessionActionStatus('success')
@@ -210,7 +224,7 @@ export default function Home() {
     }
   }, [linkToken, linkTokenExpiresAt])
 
-  const confirmLink = useCallback(async () => {
+  const confirmLink = useCallback(async (options?: { googleIdToken?: string }) => {
     const accessToken = authResponse?.accessToken ?? readStoredAccessToken()
     if (!accessToken) {
       setLinkStatus('error')
@@ -229,9 +243,10 @@ export default function Home() {
     const payload: {
       linkToken: string
       provider: LinkProvider
-      providerUserId?: string
       email?: string
       password?: string
+      idToken?: string
+      initDataRaw?: string
     } = {
       linkToken: ensuredLinkToken,
       provider: linkProvider,
@@ -256,24 +271,24 @@ export default function Home() {
       payload.email = trimmedEmail
       payload.password = linkPassword
     } else if (linkProvider === 'google') {
-      const googleSub = parseGoogleSubFromIdToken(linkGoogleIdToken.trim())
-      if (!googleSub) {
+      const googleIdToken = options?.googleIdToken?.trim()
+      if (!googleIdToken) {
         setLinkStatus('error')
-        setLinkError('Provide a valid Google ID token to extract account id (sub)')
+        setLinkError('Use Google button to authorize provider linking')
         setLinkMessage(null)
         return
       }
 
-      payload.providerUserId = googleSub
+      payload.idToken = googleIdToken
     } else {
-      if (!telegramUser?.id) {
+      if (!initDataRaw.trim()) {
         setLinkStatus('error')
-        setLinkError('Telegram linking is available only inside Telegram Mini App context')
+        setLinkError('Telegram linking from web browser is not implemented yet')
         setLinkMessage(null)
         return
       }
 
-      payload.providerUserId = String(telegramUser.id)
+      payload.initDataRaw = initDataRaw.trim()
     }
 
     setLinkStatus('loading')
@@ -302,7 +317,72 @@ export default function Home() {
       setLinkError(message)
       setLinkMessage(null)
     }
-  }, [authResponse, ensureLinkToken, linkEmail, linkGoogleIdToken, linkPassword, linkProvider, telegramUser])
+  }, [authResponse, ensureLinkToken, initDataRaw, linkEmail, linkPassword, linkProvider])
+
+  useEffect(() => {
+    if (linkProvider !== 'google') {
+      setGoogleLinkButtonReady(false)
+      return
+    }
+
+    if (isInTelegram) {
+      setGoogleLinkButtonReady(false)
+      return
+    }
+
+    if (!GOOGLE_CLIENT_ID) {
+      setGoogleLinkButtonReady(false)
+      return
+    }
+
+    let isCancelled = false
+
+    const initializeGoogleLinkButton = async () => {
+      try {
+        await loadGoogleIdentityScript()
+      } catch (error) {
+        if (!isCancelled) {
+          const message = error instanceof Error ? error.message : String(error)
+          setLinkError(message)
+          setGoogleLinkButtonReady(false)
+        }
+        return
+      }
+
+      if (isCancelled || !googleLinkButtonRef.current) {
+        return
+      }
+
+      renderGoogleSignInButton(googleLinkButtonRef.current, credential => {
+        void confirmLink({ googleIdToken: credential })
+      })
+      setGoogleLinkButtonReady(true)
+    }
+
+    void initializeGoogleLinkButton()
+
+    return () => {
+      isCancelled = true
+      if (googleLinkButtonRef.current) {
+        googleLinkButtonRef.current.innerHTML = ''
+      }
+    }
+  }, [confirmLink, isInTelegram, linkProvider])
+
+  const availableLinkProviders = useMemo(() => getAvailableLinkProviders(currentAuthProvider), [currentAuthProvider])
+
+  useEffect(() => {
+    if (availableLinkProviders.length === 0) {
+      return
+    }
+
+    if (!availableLinkProviders.includes(linkProvider)) {
+      const fallbackProvider = availableLinkProviders[0]
+      if (fallbackProvider) {
+        setLinkProvider(fallbackProvider)
+      }
+    }
+  }, [availableLinkProviders, linkProvider])
 
   useEffect(() => {
     let attempts = 0
@@ -315,12 +395,25 @@ export default function Home() {
         return false
       }
 
+      const rawInitData = (telegramWebApp.initData ?? '').trim()
+      const hasUserId = Boolean(telegramWebApp.initDataUnsafe?.user?.id)
+      const hasQueryId = Boolean(telegramWebApp.initDataUnsafe?.query_id)
+      const hasHash = Boolean(telegramWebApp.initDataUnsafe?.hash)
+      const isValidTelegramContext = rawInitData.length > 0 && (hasUserId || hasQueryId || hasHash)
+
+      if (!isValidTelegramContext) {
+        setIsInTelegram(false)
+        setInitDataRaw('')
+        setTelegramUser(null)
+        return false
+      }
+
       setIsInTelegram(true)
       telegramWebApp.ready()
       telegramWebApp.expand()
       applyTelegramTheme(telegramWebApp.themeParams)
 
-      setInitDataRaw(telegramWebApp.initData ?? '')
+      setInitDataRaw(rawInitData)
       setTelegramUser(telegramWebApp.initDataUnsafe.user ?? null)
 
       return true
@@ -440,6 +533,7 @@ export default function Home() {
               type="button"
               onClick={() => {
                 setAuthResponse(null)
+                setCurrentAuthProvider(null)
                 setAuthError(null)
                 setAuthStatus('idle')
                 clearAuthSession()
@@ -481,102 +575,126 @@ export default function Home() {
 
         <section className={styles.manualSection}>
           <h2>Account Linking</h2>
-          <p className={styles.subtitle}>
-            Linking token is generated automatically. Current token expiry: {linkTokenExpiresAt ?? 'not generated yet'}
-          </p>
+          {isInTelegram ? (
+            <p className={styles.subtitle}>
+              Linking is available only in standalone web browser. Open this app outside Telegram to link providers.
+            </p>
+          ) : null}
+          {!isInTelegram && !currentAuthProvider ? (
+            <p className={styles.subtitle}>Sign in from web auth page first to enable linking options.</p>
+          ) : null}
+          {!isInTelegram && currentAuthProvider && availableLinkProviders.length === 0 ? (
+            <p className={styles.subtitle}>No linking options available for current auth provider.</p>
+          ) : null}
+          {!isInTelegram && currentAuthProvider ? (
+            <p className={styles.subtitle}>
+              Current sign-in provider: <code>{currentAuthProvider}</code>
+            </p>
+          ) : null}
 
-          <div className={styles.fieldGrid}>
-            <label className={styles.fieldLabel}>
-              Provider
-              <select
-                className={styles.select}
-                value={linkProvider}
-                onChange={event => setLinkProvider(event.target.value as LinkProvider)}
+          {!isInTelegram && currentAuthProvider && availableLinkProviders.length > 0 ? (
+            <div className={styles.fieldGrid}>
+              <label className={styles.fieldLabel}>
+                Provider
+                <select
+                  className={styles.select}
+                  value={linkProvider}
+                  onChange={event => setLinkProvider(event.target.value as LinkProvider)}
+                >
+                  {availableLinkProviders.map(provider => (
+                    <option key={provider} value={provider}>
+                      {provider}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {linkProvider === 'email' ? (
+                <>
+                  <label className={styles.fieldLabel}>
+                    Email
+                    <input
+                      className={styles.input}
+                      type="email"
+                      value={linkEmail}
+                      onChange={event => setLinkEmail(event.target.value)}
+                      placeholder="user@example.com"
+                    />
+                  </label>
+                  <label className={styles.fieldLabel}>
+                    Password
+                    <input
+                      className={styles.input}
+                      type="password"
+                      value={linkPassword}
+                      onChange={event => setLinkPassword(event.target.value)}
+                      placeholder="Temporary flow: password is still required"
+                    />
+                  </label>
+                </>
+              ) : null}
+
+              {linkProvider === 'google' ? (
+                <div className={styles.fieldLabel}>
+                  <span>Google Account</span>
+                  <div ref={googleLinkButtonRef} className={styles.googleButtonSlot} />
+                  {!GOOGLE_CLIENT_ID ? (
+                    <span className={styles.error}>Set `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `apps/frontend/.env`.</span>
+                  ) : null}
+                  {GOOGLE_CLIENT_ID && !googleLinkButtonReady ? (
+                    <span className={styles.subtitle}>Google button is loading...</span>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {linkProvider === 'telegram' ? (
+                <div className={styles.fieldLabel}>
+                  <span>Telegram Account</span>
+                  <span className={styles.subtitle}>
+                    Telegram linking from web browser is not implemented yet. Planned via Telegram Login Widget.
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {!isInTelegram && currentAuthProvider && availableLinkProviders.length > 0 ? (
+            <div className={styles.actions}>
+              {linkProvider === 'email' ? (
+                <button
+                  className={styles.primary}
+                  type="button"
+                  onClick={() => {
+                    void confirmLink()
+                  }}
+                  disabled={linkStatus === 'loading'}
+                >
+                  {linkStatus === 'loading' ? 'Linking...' : 'Link Provider'}
+                </button>
+              ) : null}
+              {linkProvider === 'telegram' ? (
+                <button className={styles.secondary} type="button" disabled>
+                  Telegram Linking Pending
+                </button>
+              ) : null}
+
+              <button
+                className={styles.secondary}
+                type="button"
+                onClick={() => {
+                  setLinkEmail('')
+                  setLinkPassword('')
+                  setLinkError(null)
+                  setLinkMessage(null)
+                  setLinkStatus('idle')
+                }}
+                disabled={linkStatus === 'loading'}
               >
-                <option value="email">email</option>
-                <option value="google">google</option>
-                <option value="telegram">telegram</option>
-              </select>
-            </label>
+                Reset Linking Form
+              </button>
+            </div>
+          ) : null}
 
-            {linkProvider === 'email' ? (
-              <>
-                <label className={styles.fieldLabel}>
-                  Email
-                  <input
-                    className={styles.input}
-                    type="email"
-                    value={linkEmail}
-                    onChange={event => setLinkEmail(event.target.value)}
-                    placeholder="user@example.com"
-                  />
-                </label>
-                <label className={styles.fieldLabel}>
-                  Password
-                  <input
-                    className={styles.input}
-                    type="password"
-                    value={linkPassword}
-                    onChange={event => setLinkPassword(event.target.value)}
-                    placeholder="Minimum 8 characters"
-                  />
-                </label>
-              </>
-            ) : null}
-
-            {linkProvider === 'google' ? (
-              <label className={styles.fieldLabel}>
-                Google ID Token
-                <input
-                  className={styles.input}
-                  type="text"
-                  value={linkGoogleIdToken}
-                  onChange={event => setLinkGoogleIdToken(event.target.value)}
-                  placeholder="Paste Google idToken, sub will be extracted automatically"
-                />
-              </label>
-            ) : null}
-
-            {linkProvider === 'telegram' ? (
-              <label className={styles.fieldLabel}>
-                Telegram Account
-                <input
-                  className={styles.input}
-                  type="text"
-                  value={telegramUser?.id ? String(telegramUser.id) : 'Unavailable outside Telegram Mini App'}
-                  readOnly
-                />
-              </label>
-            ) : null}
-          </div>
-
-          <div className={styles.actions}>
-            <button
-              className={styles.primary}
-              type="button"
-              onClick={() => {
-                void confirmLink()
-              }}
-              disabled={linkStatus === 'loading'}
-            >
-              {linkStatus === 'loading' ? 'Linking...' : 'Link Provider'}
-            </button>
-            <button
-              className={styles.secondary}
-              type="button"
-              onClick={() => {
-                setLinkEmail('')
-                setLinkPassword('')
-                setLinkGoogleIdToken('')
-                setLinkError(null)
-                setLinkMessage(null)
-                setLinkStatus('idle')
-              }}
-              disabled={linkStatus === 'loading'}
-            >
-              Reset Linking Form
-            </button>
-          </div>
           {linkMessage ? <p className={styles.success}>{linkMessage}</p> : null}
           {linkError ? <p className={styles.error}>Error: {linkError}</p> : null}
         </section>
@@ -608,40 +726,18 @@ function formatUserName(user: TelegramWebAppUser | null): string {
   return `id:${user.id}`
 }
 
-function parseGoogleSubFromIdToken(idToken: string): string | undefined {
-  if (!idToken) {
-    return undefined
+function getAvailableLinkProviders(currentProvider: AuthProvider | null): LinkProvider[] {
+  if (currentProvider === 'google') {
+    return ['email', 'telegram']
   }
 
-  const tokenParts = idToken.split('.')
-  if (tokenParts.length < 2) {
-    return undefined
+  if (currentProvider === 'email') {
+    return ['google', 'telegram']
   }
 
-  const payloadPart = tokenParts[1]
-  if (!payloadPart) {
-    return undefined
+  if (currentProvider === 'telegram') {
+    return ['email', 'google']
   }
 
-  const payloadRaw = decodeBase64UrlToUtf8(payloadPart)
-  if (!payloadRaw) {
-    return undefined
-  }
-
-  try {
-    const payload = JSON.parse(payloadRaw) as { sub?: unknown }
-    return typeof payload.sub === 'string' && payload.sub.trim() ? payload.sub : undefined
-  } catch {
-    return undefined
-  }
-}
-
-function decodeBase64UrlToUtf8(value: string): string | undefined {
-  try {
-    const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    return atob(padded)
-  } catch {
-    return undefined
-  }
+  return []
 }

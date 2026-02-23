@@ -116,6 +116,10 @@
   font-family: var(--font-geist-mono);
 }
 
+.googleButtonSlot {
+  min-height: 42px;
+}
+
 .textarea {
   width: 100%;
   background: rgba(0, 0, 0, 0.28);

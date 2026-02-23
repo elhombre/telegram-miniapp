@@ -22,6 +22,16 @@ export class LinkConfirmDto {
 
   @IsOptional()
   @IsString()
+  @MinLength(10)
+  idToken?: string
+
+  @IsOptional()
+  @IsString()
+  @MinLength(10)
+  initDataRaw?: string
+
+  @IsOptional()
+  @IsString()
   @MaxLength(320)
   email?: string
 
