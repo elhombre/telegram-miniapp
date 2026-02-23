@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+
+  @@map("user_role")
+}
+
+enum IdentityProvider {
+  TELEGRAM
+  GOOGLE
+  EMAIL
+
+  @@map("identity_provider")
+}
+
+model User {
+  id              String             @id @default(cuid())
+  email           String?            @unique
+  emailVerifiedAt DateTime?          @map("email_verified_at")
+  role            UserRole           @default(USER)
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  identities      Identity[]
+  sessions        Session[]
+  linkTokens      AccountLinkToken[]
+
+  @@map("users")
+}
+
+model Identity {
+  id             String           @id @default(cuid())
+  userId         String           @map("user_id")
+  provider       IdentityProvider
+  providerUserId String           @map("provider_user_id")
+  email          String?
+  passwordHash   String?          @map("password_hash")
+  metadata       Json?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("identities")
+}
+
+model Session {
+  id                  String    @id @default(cuid())
+  userId              String    @map("user_id")
+  refreshTokenHash    String    @unique @map("refresh_token_hash")
+  userAgent           String?   @map("user_agent")
+  ip                  String?
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  replacedBySessionId String?   @map("replaced_by_session_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model AccountLinkToken {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("account_link_tokens")
+}

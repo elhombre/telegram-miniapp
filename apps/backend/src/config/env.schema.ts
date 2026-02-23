@@ -7,6 +7,15 @@ export interface AppEnv {
   API_PREFIX: string
   FRONTEND_ORIGIN?: string
   LOG_LEVEL: LogLevel
+  DATABASE_URL: string
+  JWT_ACCESS_SECRET: string
+  JWT_REFRESH_SECRET: string
+  ACCESS_TOKEN_TTL_SECONDS: number
+  REFRESH_TOKEN_TTL_DAYS: number
+  TELEGRAM_BOT_TOKEN?: string
+  TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: number
+  GOOGLE_CLIENT_ID?: string
+  ACCOUNT_LINK_TOKEN_TTL_MINUTES: number
 }
 
 let cachedEnv: AppEnv | undefined
@@ -24,6 +33,30 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
     API_PREFIX: parseApiPrefix(rawEnv.API_PREFIX, errors),
     FRONTEND_ORIGIN: parseOptionalUrl(rawEnv.FRONTEND_ORIGIN, 'FRONTEND_ORIGIN', errors),
     LOG_LEVEL: parseEnum(rawEnv.LOG_LEVEL, 'LOG_LEVEL', ['debug', 'info', 'warn', 'error'], 'info', errors),
+    DATABASE_URL: parseRequiredString(rawEnv.DATABASE_URL, 'DATABASE_URL', errors),
+    JWT_ACCESS_SECRET: parseRequiredString(rawEnv.JWT_ACCESS_SECRET, 'JWT_ACCESS_SECRET', errors),
+    JWT_REFRESH_SECRET: parseRequiredString(rawEnv.JWT_REFRESH_SECRET, 'JWT_REFRESH_SECRET', errors),
+    ACCESS_TOKEN_TTL_SECONDS: parsePositiveInt(
+      rawEnv.ACCESS_TOKEN_TTL_SECONDS,
+      'ACCESS_TOKEN_TTL_SECONDS',
+      900,
+      errors,
+    ),
+    REFRESH_TOKEN_TTL_DAYS: parsePositiveInt(rawEnv.REFRESH_TOKEN_TTL_DAYS, 'REFRESH_TOKEN_TTL_DAYS', 30, errors),
+    TELEGRAM_BOT_TOKEN: parseOptionalString(rawEnv.TELEGRAM_BOT_TOKEN),
+    TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: parsePositiveInt(
+      rawEnv.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS,
+      'TELEGRAM_INIT_DATA_MAX_AGE_SECONDS',
+      86400,
+      errors,
+    ),
+    GOOGLE_CLIENT_ID: parseOptionalString(rawEnv.GOOGLE_CLIENT_ID),
+    ACCOUNT_LINK_TOKEN_TTL_MINUTES: parsePositiveInt(
+      rawEnv.ACCOUNT_LINK_TOKEN_TTL_MINUTES,
+      'ACCOUNT_LINK_TOKEN_TTL_MINUTES',
+      10,
+      errors,
+    ),
   }
 
   if (errors.length > 0) {
@@ -99,3 +132,36 @@ function parseEnum<T extends string>(
   return fallback
 }
 
+function parseRequiredString(rawValue: string | undefined, variableName: string, errors: string[]): string {
+  const value = rawValue?.trim()
+  if (!value) {
+    errors.push(`${variableName} is required`)
+    return ''
+  }
+
+  return value
+}
+
+function parseOptionalString(rawValue: string | undefined): string | undefined {
+  const value = rawValue?.trim()
+  return value ? value : undefined
+}
+
+function parsePositiveInt(
+  rawValue: string | undefined,
+  variableName: string,
+  fallback: number,
+  errors: string[],
+): number {
+  if (!rawValue) {
+    return fallback
+  }
+
+  const value = Number.parseInt(rawValue, 10)
+  if (!Number.isInteger(value) || value <= 0) {
+    errors.push(`${variableName} must be a positive integer, got "${rawValue}"`)
+    return fallback
+  }
+
+  return value
+}

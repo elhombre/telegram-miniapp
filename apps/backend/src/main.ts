@@ -1,4 +1,5 @@
-import { Logger } from '@nestjs/common'
+import 'dotenv/config'
+import { Logger, ValidationPipe } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { ApiExceptionFilter } from './common/http/api-exception.filter'
 import { RequestLoggingInterceptor } from './common/http/request-logging.interceptor'
@@ -10,6 +11,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
   app.setGlobalPrefix(env.API_PREFIX)
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
   app.useGlobalInterceptors(new RequestLoggingInterceptor())
   app.useGlobalFilters(new ApiExceptionFilter())
 
