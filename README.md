@@ -112,7 +112,7 @@ Backend and frontend config checklist for this test:
 2. `apps/frontend/.env`
    - `NEXT_PUBLIC_API_MODE=proxy|direct`
      - default is `proxy`
-     - `proxy`: browser calls frontend route `POST /api/auth/telegram/verify-init-data`
+     - `proxy`: browser calls frontend routes under `POST /api/auth/*` (server-side proxy)
      - `direct`: browser calls backend URL directly
    - `BACKEND_API_BASE_URL=<backend API base URL>/api/v1` (used in `proxy` mode by Next.js server)
      - this value is private (not exposed to browser)
@@ -320,6 +320,12 @@ yarn workspace bot dev:webhook
   - Check `TELEGRAM_WEBHOOK_SECRET` and forwarded header `x-telegram-bot-api-secret-token`.
 - Backend DB issues.
   - Re-run compose + migrations and verify tables. See `../docs/runbooks/backend-phase1-db-verification.md`.
+
+## Development Process
+
+- Use `../docs/runbooks/development-workflow.md` as the default change checklist.
+- For frontend API integrations, keep `proxy` mode as baseline and add explicit endpoint mappings in `apps/frontend/lib/api.ts`.
+- When backend API contract changes, update docs and Postman assets in the same change.
 
 ## Notes
 

@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import styles from './page.module.css'
-import { getTelegramVerifyInitDataEndpoint } from '../lib/api'
+import {
+  getCurrentApiMode,
+  getLogoutEndpoint,
+  getRefreshSessionEndpoint,
+  getTelegramVerifyInitDataEndpoint,
+} from '../lib/api'
 import { applyTelegramTheme, getTelegramWebApp, type TelegramWebAppUser } from '../lib/telegram'
 
 interface AuthResponse {
@@ -22,14 +27,32 @@ interface ApiErrorResponse {
 }
 
 type AuthStatus = 'idle' | 'loading' | 'success' | 'error'
+type SessionActionStatus = 'idle' | 'loading' | 'success' | 'error'
+
+const STORAGE_KEYS = {
+  accessToken: 'miniapp.accessToken',
+  refreshToken: 'miniapp.refreshToken',
+  session: 'miniapp.session',
+} as const
+const API_MODE = getCurrentApiMode()
 
 export default function Home() {
   const [authStatus, setAuthStatus] = useState<AuthStatus>('idle')
   const [authError, setAuthError] = useState<string | null>(null)
   const [authResponse, setAuthResponse] = useState<AuthResponse | null>(null)
+  const [sessionActionStatus, setSessionActionStatus] = useState<SessionActionStatus>('idle')
+  const [sessionActionMessage, setSessionActionMessage] = useState<string | null>(null)
+  const [sessionActionError, setSessionActionError] = useState<string | null>(null)
   const [isInTelegram, setIsInTelegram] = useState(false)
   const [initDataRaw, setInitDataRaw] = useState<string>('')
   const [telegramUser, setTelegramUser] = useState<TelegramWebAppUser | null>(null)
+
+  useEffect(() => {
+    const storedSession = readStoredSession()
+    if (storedSession) {
+      setAuthResponse(storedSession)
+    }
+  }, [])
 
   const authenticate = useCallback(async (rawInitData: string) => {
     setAuthStatus('loading')
@@ -47,8 +70,7 @@ export default function Home() {
       })
 
       if (!response.ok) {
-        const errorPayload = (await response.json()) as ApiErrorResponse
-        throw new Error(errorPayload.message || errorPayload.code || `HTTP ${response.status}`)
+        throw new Error(await parseApiError(response))
       }
 
       const payload = (await response.json()) as AuthResponse
@@ -61,6 +83,92 @@ export default function Home() {
       setAuthError(message)
     }
   }, [])
+
+  const refreshSession = useCallback(async () => {
+    const refreshToken = authResponse?.refreshToken ?? readStoredRefreshToken()
+
+    if (!refreshToken) {
+      setSessionActionStatus('error')
+      setSessionActionError('Refresh token is not available')
+      setSessionActionMessage(null)
+      return
+    }
+
+    setSessionActionStatus('loading')
+    setSessionActionError(null)
+    setSessionActionMessage(null)
+
+    try {
+      const response = await fetch(getRefreshSessionEndpoint(), {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          refreshToken,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
+      }
+
+      const payload = (await response.json()) as AuthResponse
+      setAuthResponse(payload)
+      persistAuthSession(payload)
+      setSessionActionStatus('success')
+      setSessionActionMessage('Session refreshed')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setSessionActionStatus('error')
+      setSessionActionError(message)
+    }
+  }, [authResponse])
+
+  const logout = useCallback(async () => {
+    const refreshToken = authResponse?.refreshToken ?? readStoredRefreshToken()
+
+    setSessionActionStatus('loading')
+    setSessionActionError(null)
+    setSessionActionMessage(null)
+
+    if (!refreshToken) {
+      clearAuthSession()
+      setAuthResponse(null)
+      setAuthStatus('idle')
+      setAuthError(null)
+      setSessionActionStatus('success')
+      setSessionActionMessage('Local session cleared')
+      return
+    }
+
+    try {
+      const response = await fetch(getLogoutEndpoint(), {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          refreshToken,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
+      }
+
+      clearAuthSession()
+      setAuthResponse(null)
+      setAuthStatus('idle')
+      setAuthError(null)
+      setSessionActionStatus('success')
+      setSessionActionMessage('Logged out')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setSessionActionStatus('error')
+      setSessionActionError(message)
+    }
+  }, [authResponse])
 
   useEffect(() => {
     let attempts = 0
@@ -114,6 +222,7 @@ export default function Home() {
   }, [authenticate, initDataRaw])
 
   const userName = useMemo(() => formatUserName(telegramUser), [telegramUser])
+  const backendAuthStatusLabel = authStatus === 'idle' && authResponse ? 'cached' : authStatus
 
   return (
     <div className={styles.page}>
@@ -130,13 +239,14 @@ export default function Home() {
           <article className={styles.card}>
             <h2>Telegram Context</h2>
             <p>Status: {isInTelegram ? 'inside Telegram' : 'regular browser'}</p>
+            <p>API mode: {API_MODE}</p>
             <p>User: {userName}</p>
             <p>Payload size: {initDataRaw.length} chars</p>
           </article>
 
           <article className={styles.card}>
             <h2>Backend Auth</h2>
-            <p>Status: {authStatus}</p>
+            <p>Status: {backendAuthStatusLabel}</p>
             {authStatus === 'error' && authError ? <p className={styles.error}>Error: {authError}</p> : null}
             {authResponse ? (
               <div className={styles.authData}>
@@ -145,6 +255,23 @@ export default function Home() {
                 <p>Email: {authResponse.user.email ?? '—'}</p>
                 <p>Access TTL: {authResponse.expiresIn}s</p>
               </div>
+            ) : null}
+          </article>
+
+          <article className={styles.card}>
+            <h2>Session</h2>
+            <p>Status: {authResponse ? 'active' : 'empty'}</p>
+            {authResponse ? (
+              <div className={styles.authData}>
+                <p>Access: {maskToken(authResponse.accessToken)}</p>
+                <p>Refresh: {maskToken(authResponse.refreshToken)}</p>
+              </div>
+            ) : null}
+            {sessionActionStatus === 'success' && sessionActionMessage ? (
+              <p className={styles.success}>{sessionActionMessage}</p>
+            ) : null}
+            {sessionActionStatus === 'error' && sessionActionError ? (
+              <p className={styles.error}>Error: {sessionActionError}</p>
             ) : null}
           </article>
         </section>
@@ -181,11 +308,39 @@ export default function Home() {
                 setAuthResponse(null)
                 setAuthError(null)
                 setAuthStatus('idle')
-                sessionStorage.removeItem('miniapp.accessToken')
-                sessionStorage.removeItem('miniapp.refreshToken')
+                clearAuthSession()
+                setSessionActionStatus('idle')
+                setSessionActionMessage(null)
+                setSessionActionError(null)
               }}
             >
               Clear Local Session
+            </button>
+          </div>
+        </section>
+
+        <section className={styles.manualSection}>
+          <h2>Session Actions</h2>
+          <div className={styles.actions}>
+            <button
+              className={styles.primary}
+              type="button"
+              onClick={() => {
+                void refreshSession()
+              }}
+              disabled={sessionActionStatus === 'loading'}
+            >
+              {sessionActionStatus === 'loading' ? 'Processing...' : 'Refresh Session'}
+            </button>
+            <button
+              className={styles.secondary}
+              type="button"
+              onClick={() => {
+                void logout()
+              }}
+              disabled={sessionActionStatus === 'loading'}
+            >
+              Logout
             </button>
           </div>
         </section>
@@ -199,8 +354,9 @@ function persistAuthSession(payload: AuthResponse) {
     return
   }
 
-  sessionStorage.setItem('miniapp.accessToken', payload.accessToken)
-  sessionStorage.setItem('miniapp.refreshToken', payload.refreshToken)
+  sessionStorage.setItem(STORAGE_KEYS.accessToken, payload.accessToken)
+  sessionStorage.setItem(STORAGE_KEYS.refreshToken, payload.refreshToken)
+  sessionStorage.setItem(STORAGE_KEYS.session, JSON.stringify(payload))
 }
 
 function formatUserName(user: TelegramWebAppUser | null): string {
@@ -218,4 +374,68 @@ function formatUserName(user: TelegramWebAppUser | null): string {
   }
 
   return `id:${user.id}`
+}
+
+function readStoredSession(): AuthResponse | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const rawSession = sessionStorage.getItem(STORAGE_KEYS.session)
+  if (!rawSession) {
+    return null
+  }
+
+  try {
+    const payload = JSON.parse(rawSession) as AuthResponse
+    if (!payload?.accessToken || !payload?.refreshToken || !payload?.user?.id || !payload?.user?.role) {
+      return null
+    }
+    return payload
+  } catch {
+    return null
+  }
+}
+
+function readStoredRefreshToken(): string | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  return sessionStorage.getItem(STORAGE_KEYS.refreshToken)
+}
+
+function clearAuthSession() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  sessionStorage.removeItem(STORAGE_KEYS.accessToken)
+  sessionStorage.removeItem(STORAGE_KEYS.refreshToken)
+  sessionStorage.removeItem(STORAGE_KEYS.session)
+}
+
+function maskToken(value: string): string {
+  if (value.length <= 16) {
+    return value
+  }
+
+  return `${value.slice(0, 8)}...${value.slice(-8)}`
+}
+
+async function parseApiError(response: Response): Promise<string> {
+  const fallback = `HTTP ${response.status}`
+  const contentType = response.headers.get('content-type') ?? ''
+
+  try {
+    if (contentType.includes('application/json')) {
+      const payload = (await response.json()) as ApiErrorResponse
+      return payload.message || payload.code || fallback
+    }
+
+    const text = await response.text()
+    return text || fallback
+  } catch {
+    return fallback
+  }
 }

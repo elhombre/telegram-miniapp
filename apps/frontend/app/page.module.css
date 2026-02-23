@@ -83,6 +83,10 @@
   color: #ffb4b4;
 }
 
+.success {
+  color: #a9f2c4;
+}
+
 .manualSection {
   display: grid;
   gap: 12px;
