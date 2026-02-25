@@ -9,6 +9,7 @@ const LOGOUT_PATH = 'logout'
 const LINK_START_PATH = 'link/start'
 const LINK_TELEGRAM_START_PATH = 'link/telegram/start'
 const LINK_TELEGRAM_STATUS_PATH = 'link/telegram/status'
+const LINK_TELEGRAM_UNLINK_PATH = 'link/telegram/unlink'
 const LINK_PROVIDERS_PATH = 'link/providers'
 const LINK_CONFIRM_PATH = 'link/confirm'
 const LINK_EMAIL_REQUEST_PATH = 'link/email/request'
@@ -49,6 +50,10 @@ export function getLinkTelegramStartEndpoint(): string {
 
 export function getLinkTelegramStatusEndpoint(): string {
   return getAuthEndpoint(LINK_TELEGRAM_STATUS_PATH)
+}
+
+export function getLinkTelegramUnlinkEndpoint(): string {
+  return getAuthEndpoint(LINK_TELEGRAM_UNLINK_PATH)
 }
 
 export function getLinkProvidersEndpoint(): string {

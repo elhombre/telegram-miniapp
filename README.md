@@ -254,6 +254,8 @@ Steps:
      localized automatically) and wait until browser shows Telegram linked
      confirmation (the bot now uses compact start payload format
      `l_<linkToken>`)
+   - when Telegram is linked, Profile card shows `Unlink Telegram` action
+     (available only in standalone web)
 12. Open `http://localhost:3100/dashboard/notes` and verify notes flow:
    - create a text note
    - verify it appears in list with created date/time
@@ -265,6 +267,8 @@ Notes:
 - `EMAIL_PROVIDER=console` logs verification payload as `auth_email_link_verification`.
 - `EMAIL_PROVIDER=mailerlite` sends verification email through MailerLite API.
 - Link endpoints require bearer access token, so run linking after successful auth.
+- Telegram unlink is available only in standalone web profile and is blocked if
+  it would remove the last remaining sign-in provider.
 - Auth/link endpoints are rate-limited on backend.
   - if `REDIS_URL` is configured, shared counters are stored in Redis
   - if Redis is unavailable (or `REDIS_URL` is empty), backend falls back to in-memory counters and logs warning
@@ -331,6 +335,7 @@ redis-cli -u "$REDIS_URL" --scan --pattern "rl:email_login_ip_email:*:ratetest@e
     - authenticated: user icon menu with `Profile` and `Sign out`
 - Welcome page shows auth CTA buttons for unauthenticated users.
 - Profile page (`/dashboard`) includes provider cards and account linking panel.
+- Telegram provider card supports unlink action with confirmation dialog.
 
 ### Telegram Mini App Mode
 
@@ -339,6 +344,7 @@ redis-cli -u "$REDIS_URL" --scan --pattern "rl:email_login_ip_email:*:ratetest@e
 - Mini App applies safe-area paddings for top and bottom system insets.
 - Welcome page starts Telegram bootstrap auth automatically.
 - Account linking actions are disabled in Mini App UI (browser-only flow).
+- Unlink actions are also disabled in Mini App UI.
 
 ## Bot Guide (Detailed)
 

@@ -413,6 +413,22 @@ export class AuthService {
     return this.startLink(user)
   }
 
+  async unlinkTelegram(user: AuthUser): Promise<{ unlinked: true; provider: LinkProviderDto.telegram }> {
+    await this.assertProviderCanBeUnlinked(user.userId, IdentityProvider.TELEGRAM)
+
+    await this.prisma.identity.deleteMany({
+      where: {
+        userId: user.userId,
+        provider: IdentityProvider.TELEGRAM,
+      },
+    })
+
+    return {
+      unlinked: true,
+      provider: LinkProviderDto.telegram,
+    }
+  }
+
   async getLinkProviders(user: AuthUser): Promise<{
     linkedProviders: LinkProviderDto[]
     providerDetails: LinkProviderDetails
@@ -934,6 +950,32 @@ export class AuthService {
       throw new ConflictException({
         code: 'IDENTITY_ALREADY_LINKED',
         message: 'Telegram is already linked',
+      })
+    }
+  }
+
+  private async assertProviderCanBeUnlinked(userId: string, provider: IdentityProvider): Promise<void> {
+    const identities = await this.prisma.identity.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        provider: true,
+      },
+    })
+
+    const hasTargetProvider = identities.some(identity => identity.provider === provider)
+    if (!hasTargetProvider) {
+      throw new ConflictException({
+        code: 'IDENTITY_NOT_LINKED',
+        message: `${this.getProviderDisplayName(provider)} is not linked`,
+      })
+    }
+
+    const remainingProviderCount = identities.filter(identity => identity.provider !== provider).length
+    if (remainingProviderCount === 0) {
+      throw new BadRequestException({
+        code: 'LAST_PROVIDER_UNLINK_FORBIDDEN',
+        message: 'Cannot unlink the last authentication provider',
       })
     }
   }

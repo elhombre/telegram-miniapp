@@ -2,15 +2,26 @@
 
 import Link from 'next/link'
 import { Chrome, Mail, MessageCircle, ShieldCheck, ShieldX } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DashboardShell } from '@/components/app/dashboard-shell'
 import { useI18n } from '@/components/app/i18n-provider'
 import { LinkingPanel } from '@/components/app/linking-panel'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { getLinkProvidersEndpoint } from '@/lib/api'
+import { getLinkProvidersEndpoint, getLinkTelegramUnlinkEndpoint } from '@/lib/api'
 import {
   type AuthProvider,
   type AuthResponse,
@@ -56,43 +67,47 @@ export default function DashboardPage() {
   const [authProvider, setAuthProvider] = useState<AuthProvider | null>(null)
   const [linkedProviders, setLinkedProviders] = useState<LinkProvider[]>([])
   const [providerDetails, setProviderDetails] = useState<LinkProvidersResponse['providerDetails']>({})
+  const [unlinkStatus, setUnlinkStatus] = useState<'idle' | 'loading'>('idle')
+  const [unlinkMessage, setUnlinkMessage] = useState<string | null>(null)
+  const [unlinkError, setUnlinkError] = useState<string | null>(null)
 
   useEffect(() => {
     setSession(readStoredSession())
     setAuthProvider(readStoredAuthProvider())
   }, [])
 
-  useEffect(() => {
+  const loadProviders = useCallback(async () => {
     const accessToken = readStoredAccessToken()
     if (!accessToken) {
       setLinkedProviders([])
+      setProviderDetails({})
       return
     }
 
-    const fetchProviders = async () => {
-      try {
-        const response = await fetch(getLinkProvidersEndpoint(), {
-          method: 'GET',
-          headers: {
-            authorization: `Bearer ${accessToken}`,
-          },
-        })
+    try {
+      const response = await fetch(getLinkProvidersEndpoint(), {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+        },
+      })
 
-        if (!response.ok) {
-          throw new Error(await parseApiError(response))
-        }
-
-        const payload = (await response.json()) as LinkProvidersResponse
-        setLinkedProviders(payload.linkedProviders ?? [])
-        setProviderDetails(payload.providerDetails ?? {})
-      } catch {
-        setLinkedProviders([])
-        setProviderDetails({})
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
       }
-    }
 
-    void fetchProviders()
+      const payload = (await response.json()) as LinkProvidersResponse
+      setLinkedProviders(payload.linkedProviders ?? [])
+      setProviderDetails(payload.providerDetails ?? {})
+    } catch {
+      setLinkedProviders([])
+      setProviderDetails({})
+    }
   }, [])
+
+  useEffect(() => {
+    void loadProviders()
+  }, [loadProviders])
 
   const providerCards = useMemo<ProviderCardModel[]>(() => {
     const connected = new Set(linkedProviders)
@@ -150,6 +165,42 @@ export default function DashboardPage() {
   }, [authProvider, linkedProviders, providerDetails, session?.user.email, t])
 
   const isWebMode = isInTelegram === false
+  const canUnlinkTelegram = isWebMode && linkedProviders.includes('telegram')
+
+  const unlinkTelegram = useCallback(async () => {
+    const accessToken = readStoredAccessToken()
+    if (!accessToken) {
+      setUnlinkError(t('dashboard.needAuth'))
+      return
+    }
+
+    setUnlinkStatus('loading')
+    setUnlinkError(null)
+    setUnlinkMessage(null)
+
+    try {
+      const response = await fetch(getLinkTelegramUnlinkEndpoint(), {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      })
+
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
+      }
+
+      await loadProviders()
+      setUnlinkMessage(t('dashboard.telegramUnlinked'))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setUnlinkError(message)
+    } finally {
+      setUnlinkStatus('idle')
+    }
+  }, [loadProviders, t])
 
   return (
     <DashboardShell title={t('dashboard.title')} subtitle={t('dashboard.subtitle')}>
@@ -188,9 +239,32 @@ export default function DashboardPage() {
                 {isWebMode ? (
                   <div className="flex flex-wrap gap-2">
                     {card.connected ? (
-                      <Button variant="outline" size="sm" className="min-h-11" asChild>
-                        <Link href="#linking-panel">{t('dashboard.manageLinking')}</Link>
-                      </Button>
+                      card.provider === 'telegram' ? (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="min-h-11" disabled={!canUnlinkTelegram}>
+                              {t('dashboard.unlinkTelegram')}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>{t('dashboard.unlinkTelegramConfirmTitle')}</AlertDialogTitle>
+                              <AlertDialogDescription>{t('dashboard.unlinkTelegramConfirmDescription')}</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => void unlinkTelegram()}
+                                disabled={unlinkStatus === 'loading'}
+                              >
+                                {unlinkStatus === 'loading'
+                                  ? t('common.loading')
+                                  : t('dashboard.unlinkTelegramConfirmAction')}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      ) : null
                     ) : card.provider === 'telegram' ? (
                       <Button size="sm" className="min-h-11" asChild>
                         <Link href="/dashboard?link=telegram#linking-panel">{t('dashboard.connectTelegram')}</Link>
@@ -218,6 +292,13 @@ export default function DashboardPage() {
           )
         })}
       </div>
+
+      {unlinkMessage ? <p className="text-sm text-emerald-600 dark:text-emerald-400">{unlinkMessage}</p> : null}
+      {unlinkError ? (
+        <p className="text-sm text-destructive">
+          {t('common.error')}: {unlinkError}
+        </p>
+      ) : null}
 
       {isWebMode ? (
         <section id="linking-panel" className="space-y-3">

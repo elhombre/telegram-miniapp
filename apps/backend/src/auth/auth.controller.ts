@@ -131,6 +131,17 @@ export class AuthController {
     return this.authService.getTelegramLinkStatus(user, dto)
   }
 
+  @Post('link/telegram/unlink')
+  @UseGuards(AccessTokenGuard, RolesGuard)
+  @Roles(UserRole.USER, UserRole.ADMIN)
+  async unlinkTelegram(@CurrentUser() user: AuthUser, @Req() request: Request) {
+    await this.rateLimitService.assert(AUTH_RATE_LIMIT_POLICIES.LINK_CONFIRM, {
+      request,
+      userId: user.userId,
+    })
+    return this.authService.unlinkTelegram(user)
+  }
+
   @Get('link/providers')
   @UseGuards(AccessTokenGuard, RolesGuard)
   @Roles(UserRole.USER, UserRole.ADMIN)
