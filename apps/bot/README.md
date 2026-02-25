@@ -7,6 +7,7 @@ Telegram bot runtime for Phase-2.
 - `/start` command
 - menu button registration (`web_app`)
 - inline web app launch button
+- launch URL marker `miniapp=1` for stable frontend miniapp mode detection
 - start payload parsing with TTL checks (`flow`, `ref`, `campaign`, `entityId`, `ts`)
 - payload/deep-link generation via `/link`
 - `polling` mode (local)

@@ -12,6 +12,8 @@ export interface ParseStartPayloadResult {
 }
 
 const SAFE_VALUE_REGEX = /^[A-Za-z0-9._:-]{1,128}$/
+const MINIAPP_LAUNCH_PARAM = 'miniapp'
+const MINIAPP_LAUNCH_VALUE = '1'
 
 export function parseStartPayload(rawPayload: string | undefined, ttlSeconds: number): ParseStartPayloadResult {
   if (!rawPayload) {
@@ -107,6 +109,7 @@ export function generateStartPayload(input: Omit<StartPayload, 'ts'> & { ts?: nu
 
 export function buildMiniAppUrl(baseUrl: string, payload?: StartPayload): string {
   const url = new URL(baseUrl)
+  url.searchParams.set(MINIAPP_LAUNCH_PARAM, MINIAPP_LAUNCH_VALUE)
 
   if (!payload) {
     return url.toString()

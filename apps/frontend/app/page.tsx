@@ -21,7 +21,11 @@ type BootstrapStatus = 'idle' | 'loading' | 'success' | 'error'
 
 export default function WelcomePage() {
   const { t } = useI18n()
-  const { isInTelegram, initDataRaw } = useTelegramMiniApp({ waitForSignedData: true, maxAttempts: 20 })
+  const { isInTelegram, initDataRaw } = useTelegramMiniApp({
+    waitForSignedData: true,
+    maxAttempts: 40,
+    intervalMs: 150,
+  })
 
   const [session, setSession] = useState<AuthResponse | null>(null)
   const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('idle')
@@ -60,20 +64,25 @@ export default function WelcomePage() {
   }, [])
 
   useEffect(() => {
+    if (isInTelegram === true) {
+      setSession(null)
+      return
+    }
+
     const storedSession = readStoredSession()
     if (storedSession) {
       setSession(storedSession)
     }
-  }, [])
+  }, [isInTelegram])
 
   useEffect(() => {
-    if (session || isInTelegram !== true || !initDataRaw || authStartedRef.current) {
+    if (isInTelegram !== true || !initDataRaw || authStartedRef.current) {
       return
     }
 
     authStartedRef.current = true
     void authorizeTelegram(initDataRaw)
-  }, [authorizeTelegram, initDataRaw, isInTelegram, session])
+  }, [authorizeTelegram, initDataRaw, isInTelegram])
 
   return (
     <AppShell session={session}>

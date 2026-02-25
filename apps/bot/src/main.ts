@@ -88,7 +88,7 @@ async function bootstrap() {
       type: 'web_app',
       text: env.TELEGRAM_MENU_BUTTON_TEXT,
       web_app: {
-        url: env.TELEGRAM_MINIAPP_URL,
+        url: buildMiniAppUrl(env.TELEGRAM_MINIAPP_URL),
       },
     },
   })

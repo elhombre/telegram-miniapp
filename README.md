@@ -344,6 +344,7 @@ On bot startup, app configures automatically:
 - chat menu button (`web_app`) using:
   - `TELEGRAM_MENU_BUTTON_TEXT`
   - `TELEGRAM_MINIAPP_URL`
+- bot launch URLs include `miniapp=1` parameter for stable frontend Mini App mode detection
 
 You normally do not need manual BotFather setup for menu button if bot is running and can call Telegram API.
 

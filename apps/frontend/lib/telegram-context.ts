@@ -1,66 +1,58 @@
-import { applyTelegramTheme, getTelegramWebApp, type TelegramWebApp } from './telegram'
+import { getTelegramWebApp } from './telegram'
 
 export interface TelegramRuntimeContext {
-  isInTelegram: boolean
   hasSignedAuthData: boolean
-  hasTelegramUrlHints: boolean
+  hasMiniAppLaunchParam: boolean
   initDataRaw: string
-  webApp?: TelegramWebApp
 }
 
 export function readTelegramRuntimeContext(): TelegramRuntimeContext {
-  const { hasTelegramUrlHints, hintedInitDataRaw } = readTelegramUrlHints()
-  const webApp = getTelegramWebApp()
-  const initDataRaw = ((webApp?.initData ?? '').trim() || hintedInitDataRaw).trim()
+  const { hasMiniAppLaunchParam, hintedInitDataRaw } = readTelegramUrlHints()
+  const initDataRaw = hintedInitDataRaw.trim()
   const hasSignedPayload = hasSignedPayloadInInitData(initDataRaw)
-  const isInTelegram = hasSignedPayload || (hasTelegramUrlHints && Boolean(webApp))
-
-  if (webApp && hasSignedPayload) {
-    webApp.ready()
-    webApp.expand()
-    applyTelegramTheme(webApp.themeParams)
-  }
 
   return {
-    isInTelegram,
     hasSignedAuthData: hasSignedPayload,
-    hasTelegramUrlHints,
+    hasMiniAppLaunchParam,
     initDataRaw,
-    webApp,
   }
 }
 
-function readTelegramUrlHints(): { hasTelegramUrlHints: boolean; hintedInitDataRaw: string } {
+function readTelegramUrlHints(): { hasMiniAppLaunchParam: boolean; hintedInitDataRaw: string } {
   if (typeof window === 'undefined') {
     return {
-      hasTelegramUrlHints: false,
+      hasMiniAppLaunchParam: false,
       hintedInitDataRaw: '',
     }
   }
 
   const searchParams = new URLSearchParams(window.location.search)
-  if (searchParams.has('tgWebAppPlatform') || searchParams.has('tgWebAppData')) {
-    return {
-      hasTelegramUrlHints: true,
-      hintedInitDataRaw: (searchParams.get('tgWebAppData') ?? '').trim(),
-    }
-  }
-
   const hash = window.location.hash.replace(/^#/, '')
-  if (!hash) {
-    return {
-      hasTelegramUrlHints: false,
-      hintedInitDataRaw: '',
-    }
-  }
+  const hashParams = hash ? new URLSearchParams(hash) : new URLSearchParams()
+  const hasMiniAppLaunchParam = searchParams.get('miniapp') === '1' || hashParams.get('miniapp') === '1'
 
-  const hashParams = new URLSearchParams(hash)
-  const hasTelegramUrlHints = hashParams.has('tgWebAppPlatform') || hashParams.has('tgWebAppData')
-  const hintedInitDataRaw = (hashParams.get('tgWebAppData') ?? '').trim()
+  // Telegram can place signed auth payload either in query or in hash.
+  // We intentionally prefer URL hints first, then fallback to WebApp runtime value.
+  const hintedInitDataRaw =
+    (searchParams.get('tgWebAppData') ?? '').trim() ||
+    (hashParams.get('tgWebAppData') ?? '').trim() ||
+    readTelegramWebAppInitDataRaw()
+
   return {
-    hasTelegramUrlHints,
+    hasMiniAppLaunchParam,
     hintedInitDataRaw,
   }
+}
+
+function readTelegramWebAppInitDataRaw(): string {
+  const webApp = getTelegramWebApp()
+  const initDataRaw = webApp?.initData?.trim() ?? ''
+
+  if (!initDataRaw) {
+    return ''
+  }
+
+  return initDataRaw
 }
 
 function hasSignedPayloadInInitData(initDataRaw: string): boolean {

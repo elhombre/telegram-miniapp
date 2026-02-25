@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { readTelegramRuntimeContext } from './telegram-context'
+import { applyTelegramTheme, getTelegramWebApp } from './telegram'
 
 interface UseTelegramMiniAppOptions {
   waitForSignedData?: boolean
@@ -16,24 +17,22 @@ interface UseTelegramMiniAppResult {
 
 const DEFAULT_MAX_ATTEMPTS = 20
 const DEFAULT_INTERVAL_MS = 150
-const QUICK_BOOTSTRAP_ATTEMPTS = 2
-
-let cachedIsInTelegram: boolean | null = null
-let cachedInitDataRaw = ''
+const MINIAPP_MODE_STORAGE_KEY = 'miniapp.runtime.is_telegram'
 
 export function useTelegramMiniApp(options: UseTelegramMiniAppOptions = {}): UseTelegramMiniAppResult {
   const waitForSignedData = options.waitForSignedData ?? false
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS
   const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS
 
-  const [isInTelegram, setIsInTelegram] = useState<boolean | null>(cachedIsInTelegram)
-  const [initDataRaw, setInitDataRaw] = useState(cachedInitDataRaw)
+  // Keep first render deterministic for SSR/CSR hydration.
+  // Runtime mode is resolved after mount in the effect below.
+  const [isInTelegram, setIsInTelegram] = useState<boolean | null>(null)
+  const [initDataRaw, setInitDataRaw] = useState('')
 
   useEffect(() => {
     let cancelled = false
     let attempts = 0
     let timerId: ReturnType<typeof setTimeout> | undefined
-    const attemptsLimit = waitForSignedData ? maxAttempts : QUICK_BOOTSTRAP_ATTEMPTS
 
     const sync = () => {
       if (cancelled) {
@@ -41,27 +40,34 @@ export function useTelegramMiniApp(options: UseTelegramMiniAppOptions = {}): Use
       }
 
       const context = readTelegramRuntimeContext()
-      if (!context.webApp && !context.hasTelegramUrlHints) {
-        cachedIsInTelegram = false
-        cachedInitDataRaw = ''
-        setIsInTelegram(false)
-        setInitDataRaw('')
-        return
+      const persistedMiniAppMode = readPersistedMiniAppMode()
+      const inMiniAppMode = context.hasMiniAppLaunchParam || persistedMiniAppMode
+
+      if (context.hasMiniAppLaunchParam) {
+        persistMiniAppMode(true)
       }
+
+      setIsInTelegram(inMiniAppMode)
 
       if (context.hasSignedAuthData) {
-        cachedIsInTelegram = true
-        cachedInitDataRaw = context.initDataRaw
-        setIsInTelegram(true)
         setInitDataRaw(context.initDataRaw)
+
+        const webApp = getTelegramWebApp()
+        if (webApp) {
+          webApp.ready()
+          webApp.expand()
+          applyTelegramTheme(webApp.themeParams)
+        }
         return
       }
 
-      if (attempts >= attemptsLimit) {
-        cachedIsInTelegram = false
-        cachedInitDataRaw = ''
-        setIsInTelegram(false)
-        setInitDataRaw('')
+      setInitDataRaw('')
+
+      if (!waitForSignedData || !inMiniAppMode) {
+        return
+      }
+
+      if (attempts >= maxAttempts) {
         return
       }
 
@@ -82,5 +88,33 @@ export function useTelegramMiniApp(options: UseTelegramMiniAppOptions = {}): Use
   return {
     isInTelegram,
     initDataRaw,
+  }
+}
+
+function readPersistedMiniAppMode(): boolean {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    return window.sessionStorage.getItem(MINIAPP_MODE_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistMiniAppMode(value: boolean): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    if (value) {
+      window.sessionStorage.setItem(MINIAPP_MODE_STORAGE_KEY, '1')
+    } else {
+      window.sessionStorage.removeItem(MINIAPP_MODE_STORAGE_KEY)
+    }
+  } catch {
+    // Ignore storage errors.
   }
 }
