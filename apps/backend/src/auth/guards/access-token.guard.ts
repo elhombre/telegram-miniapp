@@ -11,6 +11,8 @@ import { Reflector } from '@nestjs/core'
 import { UserRole } from '../../generated/prisma/client'
 import type { Request } from 'express'
 import { getEnv } from '../../config/env.schema'
+// biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
+import { PrismaService } from '../../prisma/prisma.service'
 import { PUBLIC_ROUTE_KEY } from '../decorators/public.decorator'
 import type { AuthUser } from '../types/auth-user.type'
 
@@ -31,6 +33,7 @@ export class AccessTokenGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -54,6 +57,7 @@ export class AccessTokenGuard implements CanActivate {
     }
 
     const payload = await this.verifyAccessToken(token)
+    await this.assertActiveSession(payload)
 
     request.user = {
       userId: payload.sub,
@@ -94,6 +98,31 @@ export class AccessTokenGuard implements CanActivate {
 
       return payload
     } catch {
+      throw new UnauthorizedException({
+        code: 'INVALID_ACCESS_TOKEN',
+        message: 'Access token is invalid or expired',
+      })
+    }
+  }
+
+  private async assertActiveSession(payload: AccessTokenPayload): Promise<void> {
+    const session = await this.prisma.session.findUnique({
+      where: { id: payload.sessionId },
+      select: {
+        userId: true,
+        revokedAt: true,
+        expiresAt: true,
+      },
+    })
+
+    if (!session || session.userId !== payload.sub || session.revokedAt) {
+      throw new UnauthorizedException({
+        code: 'INVALID_ACCESS_TOKEN',
+        message: 'Access token is invalid or expired',
+      })
+    }
+
+    if (session.expiresAt.getTime() <= Date.now()) {
       throw new UnauthorizedException({
         code: 'INVALID_ACCESS_TOKEN',
         message: 'Access token is invalid or expired',

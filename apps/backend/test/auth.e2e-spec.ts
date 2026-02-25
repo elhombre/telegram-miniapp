@@ -437,19 +437,20 @@ describe('AuthController (e2e)', () => {
     })
 
     expect(refreshResponse.status).toBe(201)
+    expect(refreshResponse.body.accessToken).toEqual(expect.any(String))
     expect(refreshResponse.body.refreshToken).toEqual(expect.any(String))
     expect(refreshResponse.body.refreshToken).not.toBe(loginResponse.body.refreshToken)
 
     const linkStartResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/link/start')
-      .set('Authorization', `Bearer ${loginResponse.body.accessToken}`)
+      .set('Authorization', `Bearer ${refreshResponse.body.accessToken}`)
 
     expect(linkStartResponse.status).toBe(201)
     expect(linkStartResponse.body.linkToken).toEqual(expect.any(String))
 
     const linkEmailRequestResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/link/email/request')
-      .set('Authorization', `Bearer ${loginResponse.body.accessToken}`)
+      .set('Authorization', `Bearer ${refreshResponse.body.accessToken}`)
       .send({
         linkToken: linkStartResponse.body.linkToken,
         email: 'linked@example.com',
@@ -462,7 +463,7 @@ describe('AuthController (e2e)', () => {
 
     const linkConfirmResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/link/email/confirm')
-      .set('Authorization', `Bearer ${loginResponse.body.accessToken}`)
+      .set('Authorization', `Bearer ${refreshResponse.body.accessToken}`)
       .send({
         linkToken: linkStartResponse.body.linkToken,
         email: 'linked@example.com',
@@ -481,6 +482,16 @@ describe('AuthController (e2e)', () => {
 
     expect(logoutResponse.status).toBe(201)
     expect(logoutResponse.body).toEqual({ success: true })
+
+    const revokedSessionAccessResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/link/start')
+      .set('Authorization', `Bearer ${refreshResponse.body.accessToken}`)
+
+    expect(revokedSessionAccessResponse.status).toBe(401)
+    expect(revokedSessionAccessResponse.body).toMatchObject({
+      code: 'INVALID_ACCESS_TOKEN',
+      message: 'Access token is invalid or expired',
+    })
   })
 
   it('returns 401 for protected endpoint without access token', async () => {

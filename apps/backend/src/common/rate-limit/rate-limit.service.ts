@@ -158,9 +158,9 @@ export class RateLimitService implements OnModuleDestroy {
 }
 
 function resolveClientIp(request: Request): string {
-  const forwardedFor = request.header('x-forwarded-for')
-  const firstForwarded = forwardedFor?.split(',')[0]?.trim()
-  const rawIp = firstForwarded || request.ip || request.socket.remoteAddress || 'unknown'
+  // Use Express-resolved IP only.
+  // This prevents direct trust in client-supplied X-Forwarded-For headers.
+  const rawIp = request.ip || request.socket.remoteAddress || 'unknown'
 
   if (rawIp === '::1') {
     return '127.0.0.1'

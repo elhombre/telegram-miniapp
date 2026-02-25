@@ -11,6 +11,9 @@ export const AUTH_RATE_LIMIT_POLICIES = {
   LINK_CONFIRM: 'link_confirm',
   LINK_EMAIL_REQUEST: 'link_email_request',
   LINK_EMAIL_CONFIRM: 'link_email_confirm',
+  NOTES_LIST: 'notes_list',
+  NOTES_CREATE: 'notes_create',
+  NOTES_DELETE: 'notes_delete',
 } as const
 
 export type AuthRateLimitPolicy = (typeof AUTH_RATE_LIMIT_POLICIES)[keyof typeof AUTH_RATE_LIMIT_POLICIES]
@@ -168,6 +171,42 @@ export const POLICY_RULES: Record<AuthRateLimitPolicy, RateLimitRule[]> = {
       id: 'link_email_confirm_ip',
       limit: 20,
       windowMs: 15 * 60_000,
+      key: context => context.ip,
+    },
+  ],
+  notes_list: [
+    {
+      id: 'notes_list_user',
+      limit: 120,
+      windowMs: 60_000,
+      key: context => context.userId,
+    },
+  ],
+  notes_create: [
+    {
+      id: 'notes_create_user',
+      limit: 30,
+      windowMs: 60_000,
+      key: context => context.userId,
+    },
+    {
+      id: 'notes_create_ip',
+      limit: 60,
+      windowMs: 60_000,
+      key: context => context.ip,
+    },
+  ],
+  notes_delete: [
+    {
+      id: 'notes_delete_user',
+      limit: 60,
+      windowMs: 60_000,
+      key: context => context.userId,
+    },
+    {
+      id: 'notes_delete_ip',
+      limit: 120,
+      windowMs: 60_000,
       key: context => context.ip,
     },
   ],
