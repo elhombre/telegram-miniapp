@@ -1,11 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { Chrome, Mail, MessageCircle, ShieldCheck, ShieldX } from 'lucide-react'
+import { Chrome, Mail, MessageCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DashboardShell } from '@/components/app/dashboard-shell'
 import { useI18n } from '@/components/app/i18n-provider'
-import { LinkingPanel } from '@/components/app/linking-panel'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +14,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -70,6 +68,7 @@ export default function DashboardPage() {
   const [unlinkStatus, setUnlinkStatus] = useState<'idle' | 'loading'>('idle')
   const [unlinkMessage, setUnlinkMessage] = useState<string | null>(null)
   const [unlinkError, setUnlinkError] = useState<string | null>(null)
+  const [unlinkConfirmOpen, setUnlinkConfirmOpen] = useState(false)
 
   useEffect(() => {
     setSession(readStoredSession())
@@ -193,6 +192,7 @@ export default function DashboardPage() {
       }
 
       await loadProviders()
+      setUnlinkConfirmOpen(false)
       setUnlinkMessage(t('dashboard.telegramUnlinked'))
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -240,19 +240,23 @@ export default function DashboardPage() {
                   <div className="flex flex-wrap gap-2">
                     {card.connected ? (
                       card.provider === 'telegram' ? (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="min-h-11" disabled={!canUnlinkTelegram}>
-                              {t('dashboard.unlinkTelegram')}
-                            </Button>
-                          </AlertDialogTrigger>
+                        <AlertDialog open={unlinkConfirmOpen} onOpenChange={setUnlinkConfirmOpen}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11"
+                            disabled={!canUnlinkTelegram}
+                            onClick={() => setUnlinkConfirmOpen(true)}
+                          >
+                            {t('dashboard.unlinkTelegram')}
+                          </Button>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>{t('dashboard.unlinkTelegramConfirmTitle')}</AlertDialogTitle>
                               <AlertDialogDescription>{t('dashboard.unlinkTelegramConfirmDescription')}</AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                              <AlertDialogCancel disabled={unlinkStatus === 'loading'}>{t('common.cancel')}</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => void unlinkTelegram()}
                                 disabled={unlinkStatus === 'loading'}
@@ -267,11 +271,11 @@ export default function DashboardPage() {
                       ) : null
                     ) : card.provider === 'telegram' ? (
                       <Button size="sm" className="min-h-11" asChild>
-                        <Link href="/dashboard?link=telegram#linking-panel">{t('dashboard.connectTelegram')}</Link>
+                        <Link href="/dashboard/linking?link=telegram">{t('dashboard.connectTelegram')}</Link>
                       </Button>
                     ) : card.provider === 'google' ? (
                       <Button size="sm" className="min-h-11" asChild>
-                        <Link href="/dashboard?link=google#linking-panel">{t('dashboard.connectGoogle')}</Link>
+                        <Link href="/dashboard/linking?link=google">{t('dashboard.connectGoogle')}</Link>
                       </Button>
                     ) : (
                       <>
@@ -299,28 +303,6 @@ export default function DashboardPage() {
           {t('common.error')}: {unlinkError}
         </p>
       ) : null}
-
-      {isWebMode ? (
-        <section id="linking-panel" className="space-y-3">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">{t('linking.title')}</h2>
-          </div>
-          <LinkingPanel />
-        </section>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ShieldX className="h-4 w-4 text-muted-foreground" />
-              {t('linking.title')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CardDescription>{t('linking.browserOnly')}</CardDescription>
-          </CardContent>
-        </Card>
-      )}
     </DashboardShell>
   )
 }

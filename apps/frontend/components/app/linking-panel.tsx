@@ -52,7 +52,11 @@ interface TelegramLinkStatusResponse {
   status: TelegramLinkStatus
 }
 
-export function LinkingPanel() {
+interface LinkingPanelProps {
+  onProvidersChanged?: () => void | Promise<void>
+}
+
+export function LinkingPanel({ onProvidersChanged }: LinkingPanelProps) {
   const { t } = useI18n()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -78,6 +82,23 @@ export function LinkingPanel() {
   const [telegramStatus, setTelegramStatus] = useState<TelegramLinkStatus>('idle')
 
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
+
+  const notifyProvidersChanged = useCallback(async () => {
+    if (!onProvidersChanged) {
+      return
+    }
+
+    try {
+      await onProvidersChanged()
+    } catch {
+      // Parent refresh should not break linking flow.
+    }
+  }, [onProvidersChanged])
+
+  const navigateToProfileAfterLink = useCallback(() => {
+    router.replace('/dashboard')
+    router.refresh()
+  }, [router])
 
   useEffect(() => {
     setCurrentAuthProvider(readStoredAuthProvider())
@@ -250,6 +271,8 @@ export function LinkingPanel() {
         setMessage(t('linking.telegramLinked'))
         setError(null)
         await loadLinkedProviders()
+        await notifyProvidersChanged()
+        navigateToProfileAfterLink()
       } else if (payload.status === 'expired') {
         setStatus('error')
         setError(t('linking.telegramExpired'))
@@ -262,7 +285,7 @@ export function LinkingPanel() {
       setStatus('error')
       setError(statusErrorMessage)
     }
-  }, [loadLinkedProviders, t])
+  }, [loadLinkedProviders, navigateToProfileAfterLink, notifyProvidersChanged, t])
 
   useEffect(() => {
     if (!linkToken || telegramStatus !== 'pending') {
@@ -431,6 +454,8 @@ export function LinkingPanel() {
           setStatus('success')
           setMessage(t('linking.linked', { provider: payload.provider }))
           await loadLinkedProviders()
+          await notifyProvidersChanged()
+          navigateToProfileAfterLink()
           return
         }
 
@@ -460,6 +485,8 @@ export function LinkingPanel() {
         setStatus('success')
         setMessage(t('linking.linked', { provider: payload.provider }))
         await loadLinkedProviders()
+        await notifyProvidersChanged()
+        navigateToProfileAfterLink()
       } catch (linkError) {
         const linkMessage = linkError instanceof Error ? linkError.message : String(linkError)
         setStatus('error')
@@ -467,7 +494,16 @@ export function LinkingPanel() {
         setMessage(null)
       }
     },
-    [ensureLinkToken, linkEmail, linkEmailCode, linkProvider, loadLinkedProviders, t],
+    [
+      ensureLinkToken,
+      linkEmail,
+      linkEmailCode,
+      linkProvider,
+      loadLinkedProviders,
+      navigateToProfileAfterLink,
+      notifyProvidersChanged,
+      t,
+    ],
   )
 
   useEffect(() => {

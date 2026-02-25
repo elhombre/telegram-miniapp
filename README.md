@@ -236,8 +236,7 @@ Steps:
 8. Confirm selected account is shown on the page, then click `Sign in`.
 9. Confirm app redirects to `http://localhost:3100/` and session is active.
 10. Open `http://localhost:3100/dashboard` and confirm provider/session info is shown.
-11. Open `http://localhost:3100/dashboard` and run account linking from the
-    `Account linking` block:
+11. Open `http://localhost:3100/dashboard/linking` and run account linking:
    - linking is available only in standalone browser (disabled inside Telegram
      Mini App)
    - available providers depend on current sign-in provider:
@@ -318,7 +317,9 @@ redis-cli -u "$REDIS_URL" --scan --pattern "rl:email_login_ip_email:*:ratetest@e
 - Common top-level routes:
   - `/` -> Welcome
   - `/dashboard/notes` -> Notes
-  - `/dashboard` -> Profile + Account linking block
+  - `/dashboard` -> Profile
+  - `/dashboard/linking` -> Account linking (opened from profile action buttons,
+    no dedicated navigation tab)
 - Active navigation highlighting is section-based:
   - `/dashboard/notes` highlights only `Notes`
   - `/dashboard` (and other `/dashboard/*` pages except notes) highlights
@@ -334,7 +335,8 @@ redis-cli -u "$REDIS_URL" --scan --pattern "rl:email_login_ip_email:*:ratetest@e
     - unauthenticated: `Sign in`, `Register`
     - authenticated: user icon menu with `Profile` and `Sign out`
 - Welcome page shows auth CTA buttons for unauthenticated users.
-- Profile page (`/dashboard`) includes provider cards and account linking panel.
+- Profile page (`/dashboard`) includes provider cards.
+- Linking page (`/dashboard/linking`) contains account linking panel.
 - Telegram provider card supports unlink action with confirmation dialog.
 
 ### Telegram Mini App Mode
