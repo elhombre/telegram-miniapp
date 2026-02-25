@@ -22,7 +22,7 @@ This project was fully designed and implemented using AI-assisted development wo
 - `apps/bot`: Telegram bot runtime
 - `packages/ui`: shared UI package
 - `packages/typescript-config`: shared TS configs
-- `docker-compose.yml`: local infrastructure (`postgres`, `redis`)
+- `docker-compose.yml`: local infra/app services via profiles (`infra`, `app`)
 
 ## Delivery Status
 
@@ -33,7 +33,7 @@ This project was fully designed and implemented using AI-assisted development wo
 
 - Node.js 20+
 - Yarn 4+ (project uses `yarn@4.9.4`)
-- Docker Desktop (for local Postgres and Redis)
+- Docker Desktop (optional, for local infra/app containers)
 - Telegram account for bot setup
 
 ## Initial Setup
@@ -60,6 +60,8 @@ cp apps/bot/.env.example apps/bot/.env
   - `POSTGRES_*` values for local compose Postgres
   - `REDIS_PORT`
   - `REDIS_PASSWORD` (password for local compose Redis)
+  - `BACKEND_PORT` (optional, default `3000`)
+  - `BOT_WEBHOOK_PORT` (optional, default `3200`)
 - `apps/backend/.env`
   - `JWT_ACCESS_SECRET`
   - `JWT_REFRESH_SECRET`
@@ -88,7 +90,7 @@ cp apps/bot/.env.example apps/bot/.env
 1. Start local infrastructure services.
 
 ```bash
-docker compose up -d postgres redis
+docker compose --profile infra up -d postgres redis
 ```
 
 1. Apply database migrations.
@@ -123,6 +125,28 @@ Default URLs:
 
 - backend: `http://localhost:3000/api/v1`
 - frontend: `http://localhost:3100`
+
+## Run Backend + Bot in Docker
+
+Frontend is intentionally not containerized by default (recommended: local dev or Vercel deploy).
+
+1. Start infrastructure.
+
+```bash
+docker compose --profile infra up -d postgres redis
+```
+
+1. Start backend and bot containers.
+
+```bash
+docker compose --profile app up -d --build backend bot
+```
+
+1. Tail logs.
+
+```bash
+docker compose logs -f backend bot
+```
 
 ## Mini App Auth Smoke Test
 
@@ -288,7 +312,7 @@ Preconditions:
 1. `apps/backend/.env` has:
    - `RATE_LIMIT_ENABLED=true`
    - `REDIS_URL=redis://:redis@localhost:6379/0` (or your managed Redis URL)
-2. `docker compose up -d redis` is running from `code/`.
+2. `docker compose --profile infra up -d redis` is running from `code/`.
 3. Backend is running (`yarn workspace backend dev`).
 
 Steps:

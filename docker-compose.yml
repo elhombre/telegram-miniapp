@@ -2,7 +2,9 @@ name: miniapp
 
 services:
   postgres:
+    profiles: ["infra"]
     image: postgres:16-alpine
+    container_name: ${POSTGRES_CONTAINER_NAME:-telegram-miniapp-postgres}
     restart: unless-stopped
     env_file:
       - ./.env
@@ -21,6 +23,7 @@ services:
       retries: 10
 
   redis:
+    profiles: ["infra"]
     image: redis:7-alpine
     restart: unless-stopped
     environment:
@@ -35,6 +38,40 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  backend:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./apps/backend/.env
+      - ./.env
+    environment:
+      PORT: ${BACKEND_PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis}@redis:6379/0
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    command:
+      - sh
+      - -c
+      - yarn workspace backend prisma:migrate:deploy && yarn workspace backend start:prod
+
+  bot:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./apps/bot/.env
+    environment:
+      BACKEND_API_BASE_URL: http://backend:3000/api/v1
+      TELEGRAM_WEBHOOK_PORT: ${BOT_WEBHOOK_PORT:-3200}
+    ports:
+      - "${BOT_WEBHOOK_PORT:-3200}:3200"
 
 volumes:
   postgres_data:
