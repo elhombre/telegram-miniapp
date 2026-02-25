@@ -19,7 +19,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="outline" size="icon" className="h-8 w-8" aria-label={t('theme.label')} title={t('theme.label')}>
+      <Button variant="outline" size="icon" className="h-9 w-9" aria-label={t('theme.label')} title={t('theme.label')}>
         <Monitor className="h-4 w-4" />
         <span className="sr-only">{t('theme.label')}</span>
       </Button>
@@ -51,7 +51,7 @@ export function ThemeToggle() {
     <Button
       variant="outline"
       size="icon"
-      className="h-8 w-8"
+      className="h-9 w-9"
       onClick={() => setTheme(nextTheme)}
       aria-label={label}
       title={label}

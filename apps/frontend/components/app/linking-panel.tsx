@@ -20,6 +20,7 @@ import { type AuthProvider, parseApiError, readStoredAccessToken, readStoredAuth
 import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '@/lib/google-identity'
 import { TELEGRAM_BOT_PUBLIC_NAME } from '@/lib/telegram-login-widget'
 import { useTelegramMiniApp } from '@/lib/use-telegram-miniapp'
+import { useTheme } from 'next-themes'
 import { useI18n } from './i18n-provider'
 
 type LinkProvider = 'email' | 'google' | 'telegram'
@@ -51,17 +52,11 @@ interface TelegramLinkStatusResponse {
   status: TelegramLinkStatus
 }
 
-interface BrowserLinkDebugState {
-  telegramStartPayload: string
-  telegramStartUrl: string
-  googleCredential: string
-  googleClaimsJson: string
-}
-
 export function LinkingPanel() {
   const { t } = useI18n()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { resolvedTheme } = useTheme()
 
   const { isInTelegram } = useTelegramMiniApp()
   const [currentAuthProvider, setCurrentAuthProvider] = useState<AuthProvider | null>(null)
@@ -81,12 +76,6 @@ export function LinkingPanel() {
   const [selectedGoogleIdToken, setSelectedGoogleIdToken] = useState('')
   const [selectedGoogleAccountLabel, setSelectedGoogleAccountLabel] = useState('')
   const [telegramStatus, setTelegramStatus] = useState<TelegramLinkStatus>('idle')
-  const [browserDebug, setBrowserDebug] = useState<BrowserLinkDebugState>({
-    telegramStartPayload: '',
-    telegramStartUrl: '',
-    googleCredential: '',
-    googleClaimsJson: '',
-  })
 
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
 
@@ -131,6 +120,14 @@ export function LinkingPanel() {
     }
 
     if (searchParams.get('link_provider') !== 'email') {
+      const requestedProvider = searchParams.get('link')
+      if (
+        requestedProvider === 'email' ||
+        requestedProvider === 'google' ||
+        requestedProvider === 'telegram'
+      ) {
+        setLinkProvider(requestedProvider)
+      }
       return
     }
 
@@ -376,12 +373,6 @@ export function LinkingPanel() {
         throw new Error('NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME must be a valid bot username')
       }
 
-      setBrowserDebug(currentState => ({
-        ...currentState,
-        telegramStartPayload: startPayload,
-        telegramStartUrl: startUrl,
-      }))
-
       setTelegramStatus('pending')
       setStatus('success')
       setMessage(t('linking.telegramOpenPrompt'))
@@ -505,17 +496,13 @@ export function LinkingPanel() {
       renderGoogleSignInButton(googleButtonRef.current, credential => {
         const claimsPayload = decodeJwtPayloadObject(credential)
         const accountLabel = getGoogleAccountLabel(claimsPayload, t('auth.googleSelectedFallback'))
-        const googleClaimsJson = safeDecodeJwtPayload(credential)
-        setBrowserDebug(currentState => ({
-          ...currentState,
-          googleCredential: credential,
-          googleClaimsJson,
-        }))
         setSelectedGoogleIdToken(credential)
         setSelectedGoogleAccountLabel(accountLabel)
         setStatus('idle')
         setError(null)
         setMessage(null)
+      }, {
+        theme: resolvedTheme === 'dark' ? 'filled_black' : 'outline',
       })
 
       setGoogleReady(true)
@@ -529,7 +516,7 @@ export function LinkingPanel() {
         googleButtonRef.current.innerHTML = ''
       }
     }
-  }, [isInTelegram, linkProvider, t])
+  }, [isInTelegram, linkProvider, resolvedTheme, t])
 
   return (
     <Card>
@@ -587,7 +574,7 @@ export function LinkingPanel() {
               {linkProvider === 'google' ? (
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Google</Label>
-                  <div ref={googleButtonRef} className="min-h-10" />
+                  <div ref={googleButtonRef} className="google-signin-container min-h-10" />
                   {GOOGLE_CLIENT_ID && !googleReady ? (
                     <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
                   ) : null}
@@ -614,10 +601,15 @@ export function LinkingPanel() {
             <div className="flex flex-wrap gap-2">
               {linkProvider === 'email' ? (
                 <>
-                  <Button onClick={() => void requestEmailCode()} disabled={status === 'loading'}>
+                  <Button className="min-h-11" onClick={() => void requestEmailCode()} disabled={status === 'loading'}>
                     {t('linking.sendCode')}
                   </Button>
-                  <Button variant="secondary" onClick={() => void confirmLink()} disabled={status === 'loading'}>
+                  <Button
+                    variant="secondary"
+                    className="min-h-11"
+                    onClick={() => void confirmLink()}
+                    disabled={status === 'loading'}
+                  >
                     {t('linking.confirmCode')}
                   </Button>
                 </>
@@ -626,6 +618,7 @@ export function LinkingPanel() {
               {linkProvider === 'google' ? (
                 <Button
                   variant="secondary"
+                  className="min-h-11"
                   onClick={() => void confirmLink({ googleIdToken: selectedGoogleIdToken })}
                   disabled={status === 'loading' || !selectedGoogleIdToken}
                 >
@@ -634,13 +627,19 @@ export function LinkingPanel() {
               ) : null}
 
               {linkProvider === 'telegram' ? (
-                <Button variant="secondary" onClick={() => void startTelegramLink()} disabled={status === 'loading'}>
+                <Button
+                  variant="secondary"
+                  className="min-h-11"
+                  onClick={() => void startTelegramLink()}
+                  disabled={status === 'loading'}
+                >
                   {t('linking.telegramStartButton')}
                 </Button>
               ) : null}
 
               <Button
                 variant="outline"
+                className="min-h-11"
                 disabled={status === 'loading'}
                 onClick={() => {
                   setLinkEmail('')
@@ -669,40 +668,6 @@ export function LinkingPanel() {
             {t('common.error')}: {error}
           </p>
         ) : null}
-
-        {isInTelegram === false ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('debug.browserLinkTitle')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <p className="font-medium">{t('debug.telegramStartPayload')}</p>
-                <pre className="overflow-x-auto rounded-md bg-muted p-2">
-                  {browserDebug.telegramStartPayload || t('debug.empty')}
-                </pre>
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium">{t('debug.telegramStartUrl')}</p>
-                <pre className="overflow-x-auto rounded-md bg-muted p-2">
-                  {browserDebug.telegramStartUrl || t('debug.empty')}
-                </pre>
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium">{t('debug.googleCredential')}</p>
-                <pre className="overflow-x-auto rounded-md bg-muted p-2">
-                  {browserDebug.googleCredential || t('debug.empty')}
-                </pre>
-              </div>
-              <div className="space-y-1">
-                <p className="font-medium">{t('debug.googleClaims')}</p>
-                <pre className="overflow-x-auto rounded-md bg-muted p-2">
-                  {browserDebug.googleClaimsJson || t('debug.empty')}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
       </CardContent>
     </Card>
   )
@@ -728,15 +693,6 @@ function getAvailableLinkProviders(
   }
 
   return candidates.filter(provider => !alreadyLinked.has(provider))
-}
-
-function safeDecodeJwtPayload(jwt: string): string {
-  const payload = decodeJwtPayloadObject(jwt)
-  if (!payload) {
-    return JSON.stringify({ parseError: 'Cannot decode JWT payload' }, null, 2)
-  }
-
-  return JSON.stringify(payload, null, 2)
 }
 
 function decodeJwtPayloadObject(jwt: string): Record<string, unknown> | null {

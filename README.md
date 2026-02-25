@@ -122,7 +122,7 @@ Default URLs:
 
 ## Mini App Auth Smoke Test
 
-Goal: verify Telegram `initDataRaw` is validated on backend and frontend receives auth session.
+Goal: verify Telegram Mini App auth is validated on backend and frontend receives auth session.
 
 Preconditions:
 
@@ -197,7 +197,8 @@ Preconditions:
    - `apps/backend/.env` has `GOOGLE_CLIENT_ID=<your-google-oauth-client-id>`
    - `apps/frontend/.env` has `NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same-client-id>`
 5. For Telegram linking from browser (bot flow):
-   - `apps/frontend/.env` has `NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME=<bot_username_without_@>`
+   - `apps/frontend/.env` has
+     `NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME=<public_bot_name_from_t.me_link_without_@>`
    - `apps/backend/.env` has `TELEGRAM_BOT_LINK_SECRET=<shared_secret>`
    - `apps/bot/.env` has:
      - `TELEGRAM_MINIAPP_URL=<miniapp_url>`
@@ -235,19 +236,24 @@ Steps:
 8. Confirm selected account is shown on the page, then click `Sign in`.
 9. Confirm app redirects to `http://localhost:3100/` and session is active.
 10. Open `http://localhost:3100/dashboard` and confirm provider/session info is shown.
-11. Open `http://localhost:3100/dashboard/linking` and run account linking:
-   - linking is available only in standalone browser (disabled inside Telegram Mini App)
+11. Open `http://localhost:3100/dashboard` and run account linking from the
+    `Account linking` block:
+   - linking is available only in standalone browser (disabled inside Telegram
+     Mini App)
    - available providers depend on current sign-in provider:
      - signed in with `google`: `email`, `telegram`
      - signed in with `email`: `google`, `telegram`
-     - signed in with `telegram`: `email`, `google`
-   - `google`: click Google button in linking section and select account,
-     then click `Confirm and link Google` to submit linking
-   - `email`: fill email, click `Send Verification Code`, then enter 6-digit code and click `Confirm Code & Link`
-   - `telegram`: click `Open Telegram and continue`, then press `Start` in bot chat,
-     then press bot button `Svjazat`/`Связать` to confirm linking in bot chat
-     and wait until browser shows Telegram linked confirmation
-     (the bot now uses compact start payload format `l_<linkToken>`)
+     - signed in with `telegram`: `email`, `google` (mainly test/dev scenario
+       for standalone web)
+   - `google`: click Google button in linking section and select account, then
+     click `Confirm and link Google` to submit linking
+   - `email`: fill email, click `Send Verification Code`, then enter 6-digit
+     code and click `Confirm Code & Link`
+   - `telegram`: click `Open Telegram and continue`, then press `Start` in bot
+     chat, then press the confirmation button shown by the bot (label is
+     localized automatically) and wait until browser shows Telegram linked
+     confirmation (the bot now uses compact start payload format
+     `l_<linkToken>`)
 12. Open `http://localhost:3100/dashboard/notes` and verify notes flow:
    - create a text note
    - verify it appears in list with created date/time
@@ -299,17 +305,40 @@ Expected:
 redis-cli -u "$REDIS_URL" --scan --pattern "rl:email_login_ip_email:*:ratetest@example.com"
 ```
 
-## UI Baseline
+## UI Guide
 
-- Welcome page is shared for Telegram Mini App and regular browser.
+- UI is shared between standalone web and Telegram Mini App.
 - Header brand label is `Demo`; click it to navigate to `/`.
-- Browser mode uses dashboard sidebar navigation with toggle.
-- Telegram mode uses compact in-page menu for dashboard sections.
-- Notes section is available in both browser and Telegram Mini App modes.
-- UI stack is based on shadcn/ui components.
-- Theme switcher is a 3-state button: `light -> dark -> system -> light`.
-- i18n: `en` and `ru`, with locale JSON dictionaries.
-- In Telegram Mini App, web auth actions (`Sign in`, `Create account`, provider linking page/actions) are hidden/disabled by design.
+- UI stack is based on `shadcn/ui` + Tailwind CSS.
+- i18n is enabled with locale dictionaries: `en`, `ru`.
+- Common top-level routes:
+  - `/` -> Welcome
+  - `/dashboard/notes` -> Notes
+  - `/dashboard` -> Profile + Account linking block
+- Active navigation highlighting is section-based:
+  - `/dashboard/notes` highlights only `Notes`
+  - `/dashboard` (and other `/dashboard/*` pages except notes) highlights
+    `Profile`
+
+### Standalone Web Mode
+
+- Header contains:
+  - desktop top navigation (`Welcome`, `Notes`, `Profile`)
+  - language switcher (`EN`/`RU`)
+  - theme toggle (3-state cycle: `light -> dark -> system`)
+  - auth controls:
+    - unauthenticated: `Sign in`, `Register`
+    - authenticated: user icon menu with `Profile` and `Sign out`
+- Welcome page shows auth CTA buttons for unauthenticated users.
+- Profile page (`/dashboard`) includes provider cards and account linking panel.
+
+### Telegram Mini App Mode
+
+- Header keeps only global controls (language + theme); web auth controls are hidden.
+- Bottom navigation is used for section switching (`Welcome`, `Notes`, `Profile`).
+- Mini App applies safe-area paddings for top and bottom system insets.
+- Welcome page starts Telegram bootstrap auth automatically.
+- Account linking actions are disabled in Mini App UI (browser-only flow).
 
 ## Bot Guide (Detailed)
 
@@ -326,7 +355,8 @@ Use BotFather in Telegram.
 Optional hardening:
 
 - If token leaked, run `/revoke` in BotFather and update env.
-- For Telegram Login Widget (browser linking), run `/setdomain` in BotFather and set your frontend domain (`example.com`, no path).
+- If you use Telegram Login Widget in custom flows, run `/setdomain` in
+  BotFather and set your frontend domain (`example.com`, no path).
 
 ### 2. Configure Mini App URL
 
@@ -358,7 +388,7 @@ On bot startup, app configures automatically:
 - chat menu button (`web_app`) using:
   - `TELEGRAM_MENU_BUTTON_TEXT`
   - `TELEGRAM_MINIAPP_URL`
-- bot launch URLs include `miniapp=1` parameter for stable frontend Mini App mode detection
+- bot launch URLs include a Mini App marker for stable frontend mode detection
 
 You normally do not need manual BotFather setup for menu button if bot is running and can call Telegram API.
 
@@ -473,7 +503,8 @@ yarn workspace bot dev:webhook
 - Telegram cannot open Mini App.
   - Check `TELEGRAM_MINIAPP_URL` is public HTTPS.
 - Telegram linking does not confirm in browser.
-  - In Telegram chat with bot, press `Start`, then press button `Svjazat`/`Связать`.
+  - In Telegram chat with bot, press `Start`, then press the confirmation
+    button shown by the bot (label is localized automatically).
   - Ensure `TELEGRAM_BOT_LINK_SECRET` is identical in `apps/backend/.env` and `apps/bot/.env`.
   - Ensure `apps/bot/.env:BACKEND_API_BASE_URL` points to backend API prefix (example: `http://localhost:3000/api/v1`).
   - If bot shows `Link failed: Bot backend linking integration is not configured`,

@@ -1,6 +1,7 @@
 export const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim() ?? ''
 
 const GOOGLE_SDK_SCRIPT_ID = 'google-identity-services-sdk'
+export type GoogleButtonTheme = 'outline' | 'filled_blue' | 'filled_black'
 
 export async function loadGoogleIdentityScript(): Promise<void> {
   if (window.google?.accounts?.id) {
@@ -15,7 +16,11 @@ export async function loadGoogleIdentityScript(): Promise<void> {
   await waitForGoogleObject()
 }
 
-export function renderGoogleSignInButton(parent: HTMLElement, onCredential: (credential: string) => void): void {
+export function renderGoogleSignInButton(
+  parent: HTMLElement,
+  onCredential: (credential: string) => void,
+  options?: { theme?: GoogleButtonTheme },
+): void {
   if (!GOOGLE_CLIENT_ID) {
     throw new Error('NEXT_PUBLIC_GOOGLE_CLIENT_ID is not configured')
   }
@@ -39,11 +44,13 @@ export function renderGoogleSignInButton(parent: HTMLElement, onCredential: (cre
   })
 
   idApi.renderButton(parent, {
-    theme: 'outline',
+    theme: options?.theme ?? 'outline',
     size: 'large',
     text: 'signin_with',
     shape: 'pill',
   })
+
+  normalizeGoogleButtonStyles(parent)
 }
 
 async function injectGoogleIdentityScript(): Promise<void> {
@@ -79,6 +86,17 @@ async function waitForGoogleObject(): Promise<void> {
       }
     }, 50)
   })
+}
+
+function normalizeGoogleButtonStyles(parent: HTMLElement): void {
+  parent.style.border = '0'
+  parent.style.boxShadow = 'none'
+
+  const nestedElements = parent.querySelectorAll<HTMLElement>('iframe, div')
+  for (const element of nestedElements) {
+    element.style.border = '0'
+    element.style.boxShadow = 'none'
+  }
 }
 
 declare global {

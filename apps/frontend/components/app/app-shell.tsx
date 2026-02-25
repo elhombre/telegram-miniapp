@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { SiteHeader } from './site-header'
+import { BottomNavigation } from './bottom-navigation'
 import type { AuthResponse } from '@/lib/auth-client'
 import { clearAuthSession, parseApiError, readStoredRefreshToken } from '@/lib/auth-client'
 import { getLogoutEndpoint } from '@/lib/api'
+import { useTelegramMiniApp } from '@/lib/use-telegram-miniapp'
 
 interface AppShellProps {
   session: AuthResponse | null
@@ -14,6 +16,7 @@ interface AppShellProps {
 
 export function AppShell({ session, children }: AppShellProps) {
   const router = useRouter()
+  const { isInTelegram } = useTelegramMiniApp()
   const [headerSession, setHeaderSession] = useState<AuthResponse | null>(session)
 
   useEffect(() => {
@@ -48,9 +51,18 @@ export function AppShell({ session, children }: AppShellProps) {
   }, [router])
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <SiteHeader session={headerSession} onLogout={headerSession ? logout : undefined} />
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">{children}</main>
+      <main
+        className={
+          isInTelegram === true
+            ? 'mx-auto w-full max-w-6xl px-4 py-5 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6'
+            : 'mx-auto w-full max-w-6xl px-4 py-8 sm:px-6'
+        }
+      >
+        {children}
+      </main>
+      <BottomNavigation />
     </div>
   )
 }

@@ -17,7 +17,7 @@
   },
   "nav": {
     "welcome": "Главная",
-    "dashboard": "Кабинет",
+    "dashboard": "Профиль",
     "notes": "Заметки",
     "linking": "Связанные аккаунты",
     "login": "Вход",
@@ -40,19 +40,27 @@
     "subtitle": "Используйте единый профиль, связывайте провайдеры и управляйте сессиями в одном месте.",
     "openDashboard": "Открыть кабинет",
     "openLogin": "Войти",
-  "openRegister": "Создать аккаунт",
-  "inTelegram": "Вы открыли приложение в Telegram. Авторизация запускается автоматически.",
-  "bootstrapError": "Не удалось авторизоваться через Telegram. Попробуйте открыть mini app снова.",
-  "features": {
+    "openRegister": "Создать аккаунт",
+    "openNotes": "Открыть заметки",
+    "openProfile": "Открыть профиль",
+    "inTelegram": "Вы открыли приложение в Telegram. Авторизация запускается автоматически.",
+    "bootstrapError": "Не удалось авторизоваться через Telegram. Попробуйте открыть mini app снова.",
+    "features": {
       "title": "Что доступно",
       "identity": "Единый аккаунт с явной привязкой провайдеров",
       "security": "Поток подтверждения email кодом для линковки",
-      "ux": "Дружелюбный интерфейс для браузера и Telegram"
+      "ux": "Дружелюбный интерфейс для браузера и Telegram",
+      "authProviders": "Три провайдера входа: Telegram, Email, Google",
+      "linking": "Явная привязка аккаунтов между провайдерами",
+      "notes": "Текстовые заметки с добавлением и удалением",
+      "i18n": "Локализация для английского и русского",
+      "theme": "Переключение темы: светлая, тёмная, системная",
+      "platforms": "Единый UX для miniapp Telegram и standalone web"
     }
   },
   "dashboard": {
-    "title": "Кабинет пользователя",
-    "subtitle": "Управляйте профилем, провайдерами и активной сессией.",
+    "title": "Профиль",
+    "subtitle": "Управляйте подключёнными провайдерами и активной сессией аккаунта.",
     "telegramMenu": "Меню",
     "overview": "Обзор",
     "notes": "Заметки",
@@ -64,7 +72,20 @@
     "role": "Роль",
     "provider": "Текущий провайдер",
     "email": "Email",
-    "sessionReady": "Активная сессия"
+    "sessionReady": "Активная сессия",
+    "connected": "Подключено",
+    "notConnected": "Не подключено",
+    "activeProvider": "Активный провайдер",
+    "manageLinking": "Управление привязкой",
+    "connectTelegram": "Подключить Telegram",
+    "connectGoogle": "Подключить Google",
+    "goToSignIn": "Перейти ко входу",
+    "goToRegister": "Перейти к регистрации",
+    "miniappProfileHint": "Управление привязкой доступно в standalone web режиме.",
+    "linkingMovedTitle": "Привязка перенесена в профиль",
+    "linkingMovedDescription": "Управляйте подключениями провайдеров в разделе профиля.",
+    "openProfile": "Открыть профиль",
+    "currentSessionProvider": "Текущий провайдер сессии"
   },
   "notes": {
     "title": "Заметки",
@@ -80,7 +101,9 @@
     "empty": "Заметок пока нет.",
     "createdAt": "Создано",
     "delete": "Удалить",
-    "deleting": "Удаление..."
+    "deleting": "Удаление...",
+    "deleteConfirmTitle": "Удалить заметку?",
+    "deleteConfirmDescription": "Это действие нельзя отменить."
   },
   "linking": {
     "title": "Линковка аккаунтов",
@@ -127,6 +150,7 @@
     "passwordConfirm": "Подтвердите пароль",
     "alreadyHave": "Уже есть аккаунт?",
     "noAccount": "Нужен аккаунт?",
+    "linkingMode": "Режим привязки",
     "passwordMismatch": "Подтверждение пароля не совпадает",
     "sessionReady": "Сессия активна"
   },

@@ -1,12 +1,25 @@
 'use client'
 
-import { Trash2 } from 'lucide-react'
+import { CalendarClock, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useI18n } from '@/components/app/i18n-provider'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { getDeleteNoteEndpoint, getNotesEndpoint } from '@/lib/api'
 import { parseApiError, readStoredAccessToken } from '@/lib/auth-client'
@@ -28,6 +41,7 @@ interface NoteCreateResponse {
 }
 
 const FALLBACK_MAX_LENGTH = 2000
+const NOTE_SKELETON_KEYS = ['skeleton-a', 'skeleton-b', 'skeleton-c'] as const
 
 export function NotesPanel() {
   const { locale, t } = useI18n()
@@ -41,6 +55,9 @@ export function NotesPanel() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const trimmedNoteLength = useMemo(() => noteText.trim().length, [noteText])
+  const sortedNotes = useMemo(() => {
+    return [...notes].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
+  }, [notes])
 
   const formatCreatedAt = useMemo(() => {
     return new Intl.DateTimeFormat(locale, {
@@ -168,13 +185,13 @@ export function NotesPanel() {
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Card>
         <CardHeader>
           <CardTitle>{t('notes.createTitle')}</CardTitle>
           <CardDescription>{t('notes.maxLengthHint', { maxLength: String(maxLength) })}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="note-text">{t('notes.noteLabel')}</Label>
             <Textarea
@@ -183,15 +200,16 @@ export function NotesPanel() {
               onChange={event => setNoteText(event.target.value)}
               maxLength={maxLength}
               placeholder={t('notes.notePlaceholder')}
-              rows={4}
+              rows={5}
             />
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
+            <Badge variant="outline">
               {trimmedNoteLength}/{maxLength}
-            </p>
-            <Button onClick={createNote} disabled={!canCreateNote}>
+            </Badge>
+            <Button onClick={createNote} disabled={!canCreateNote} className="min-h-11">
+              <Plus className="h-4 w-4" />
               {isCreating ? t('notes.saving') : t('notes.add')}
             </Button>
           </div>
@@ -207,32 +225,70 @@ export function NotesPanel() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
-          ) : notes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('notes.empty')}</p>
+            <div className="space-y-3">
+              {NOTE_SKELETON_KEYS.map(skeletonKey => (
+                <Card key={skeletonKey}>
+                  <CardContent className="space-y-3 pt-6">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-9 w-28" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : sortedNotes.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="pt-6 text-sm text-muted-foreground">{t('notes.empty')}</CardContent>
+            </Card>
           ) : (
             <div className="space-y-3">
-              {notes.map(note => (
+              {sortedNotes.map(note => (
                 <Card key={note.id}>
                   <CardContent className="space-y-3 pt-6">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Badge variant="secondary">{t('notes.createdAt')}</Badge>
+                      <Badge variant="secondary" className="gap-1">
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        {t('notes.createdAt')}
+                      </Badge>
                       <span className="text-xs text-muted-foreground">
                         {formatCreatedAt.format(new Date(note.createdAt))}
                       </span>
                     </div>
-                    <p className="whitespace-pre-wrap text-sm leading-6">{note.text}</p>
+
+                    <Separator />
+
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6">{note.text}</p>
+
                     <div className="flex justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void deleteNote(note.id)}
-                        disabled={deletingNoteId === note.id}
-                        className="gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {deletingNoteId === note.id ? t('notes.deleting') : t('notes.delete')}
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 gap-2"
+                            disabled={deletingNoteId === note.id}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            {deletingNoteId === note.id ? t('notes.deleting') : t('notes.delete')}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{t('notes.deleteConfirmTitle')}</AlertDialogTitle>
+                            <AlertDialogDescription>{t('notes.deleteConfirmDescription')}</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              onClick={() => void deleteNote(note.id)}
+                            >
+                              {t('notes.delete')}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </CardContent>
                 </Card>

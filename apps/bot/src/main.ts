@@ -44,7 +44,7 @@ bot.command('start', async ctx => {
 
   if (parseResult.payload?.linkToken) {
     const callbackData = `${LINK_CALLBACK_PREFIX}${parseResult.payload.linkToken}`
-    const confirmKeyboard = new InlineKeyboard().text(env.TELEGRAM_LINK_CONFIRM_BUTTON_TEXT, callbackData)
+    const confirmKeyboard = new InlineKeyboard().text(getLinkConfirmButtonText(ctx.from?.language_code), callbackData)
     await ctx.reply('To complete linking, press the button below.', {
       reply_markup: confirmKeyboard,
     })
@@ -235,6 +235,16 @@ function extractStartPayload(text: string | undefined): string | undefined {
   }
 
   return parts.slice(1).join(' ')
+}
+
+function getLinkConfirmButtonText(languageCode: string | undefined): string {
+  const normalized = languageCode?.trim().toLowerCase()
+
+  if (normalized?.startsWith('ru')) {
+    return 'Связать аккаунт'
+  }
+
+  return 'Link account'
 }
 
 async function confirmTelegramLinkViaBackend(

@@ -7,7 +7,6 @@ export interface BotEnv {
   TELEGRAM_BOT_TOKEN: string
   TELEGRAM_MINIAPP_URL: string
   TELEGRAM_MENU_BUTTON_TEXT: string
-  TELEGRAM_LINK_CONFIRM_BUTTON_TEXT: string
   TELEGRAM_START_PAYLOAD_TTL_SECONDS: number
   TELEGRAM_WEBHOOK_BASE_URL?: string
   TELEGRAM_WEBHOOK_PATH: string
@@ -36,12 +35,6 @@ export function getBotEnv(rawEnv: NodeJS.ProcessEnv = process.env): BotEnv {
       rawEnv.TELEGRAM_MENU_BUTTON_TEXT,
       'TELEGRAM_MENU_BUTTON_TEXT',
       'Open Mini App',
-      errors,
-    ),
-    TELEGRAM_LINK_CONFIRM_BUTTON_TEXT: parseNonEmptyString(
-      rawEnv.TELEGRAM_LINK_CONFIRM_BUTTON_TEXT,
-      'TELEGRAM_LINK_CONFIRM_BUTTON_TEXT',
-      'Link account',
       errors,
     ),
     TELEGRAM_START_PAYLOAD_TTL_SECONDS: parsePositiveInt(

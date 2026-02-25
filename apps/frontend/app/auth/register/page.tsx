@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AppShell } from '@/components/app/app-shell'
 import { useI18n } from '@/components/app/i18n-provider'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ type SubmitStatus = 'idle' | 'loading' | 'success' | 'error'
 export default function RegisterPage() {
   const { t } = useI18n()
   const router = useRouter()
+  const [isLinkingMode, setIsLinkingMode] = useState(false)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,6 +32,11 @@ export default function RegisterPage() {
   const canSubmit = useMemo(() => {
     return email.trim().length > 3 && password.length >= 8 && passwordConfirm.length >= 8
   }, [email, password, passwordConfirm])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setIsLinkingMode(params.get('mode') === 'linking')
+  }, [])
 
   if (isInTelegram !== false) {
     return (
@@ -53,8 +60,9 @@ export default function RegisterPage() {
 
   return (
     <AppShell session={session}>
-      <Card className="mx-auto max-w-md">
+      <Card className="mx-auto w-full max-w-md">
         <CardHeader>
+          {isLinkingMode ? <Badge className="w-fit">{t('auth.linkingMode')}</Badge> : null}
           <CardTitle>{t('auth.registerTitle')}</CardTitle>
           <CardDescription>{t('auth.registerSubtitle')}</CardDescription>
         </CardHeader>
@@ -141,12 +149,13 @@ export default function RegisterPage() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={status === 'loading' || !canSubmit}>
+              <Button className="min-h-11" type="submit" disabled={status === 'loading' || !canSubmit}>
                 {status === 'loading' ? t('common.loading') : t('auth.submitRegister')}
               </Button>
               <Button
                 type="button"
                 variant="outline"
+                className="min-h-11"
                 disabled={status === 'loading'}
                 onClick={() => {
                   setEmail('')
@@ -156,7 +165,7 @@ export default function RegisterPage() {
                   setError(null)
                 }}
               >
-                {t('linking.reset')}
+                {t('common.cancel')}
               </Button>
             </div>
           </form>
@@ -175,9 +184,11 @@ export default function RegisterPage() {
             <Link className="text-foreground underline" href="/auth/login">
               {t('nav.login')}
             </Link>
-            <Link className="text-foreground underline" href="/auth/google">
-              {t('nav.google')}
-            </Link>
+            {!isLinkingMode ? (
+              <Link className="text-foreground underline" href="/auth/google">
+                {t('nav.google')}
+              </Link>
+            ) : null}
           </div>
         </CardContent>
       </Card>

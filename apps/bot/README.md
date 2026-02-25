@@ -21,9 +21,13 @@ Copy `.env.example` to `.env` and set at least:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_MINIAPP_URL`
-- `TELEGRAM_LINK_CONFIRM_BUTTON_TEXT` (text for explicit link button, example: `Связать`)
 - `BACKEND_API_BASE_URL` (for link confirmation callback)
 - `TELEGRAM_BOT_LINK_SECRET` (must match backend `TELEGRAM_BOT_LINK_SECRET`)
+
+Link confirmation button label is localized automatically:
+
+- `ru*` -> `Связать аккаунт`
+- fallback -> `Link account`
 
 For webhook mode also set:
 

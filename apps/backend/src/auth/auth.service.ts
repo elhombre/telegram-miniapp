@@ -58,6 +58,21 @@ interface ActiveLinkToken {
   expiresAt: Date
 }
 
+export interface LinkProviderDetails {
+  email?: {
+    email?: string
+  }
+  google?: {
+    email?: string
+    name?: string
+  }
+  telegram?: {
+    username?: string
+    firstName?: string
+    lastName?: string
+  }
+}
+
 @Injectable()
 export class AuthService {
   private readonly env = getEnv()
@@ -398,27 +413,53 @@ export class AuthService {
     return this.startLink(user)
   }
 
-  async getLinkProviders(user: AuthUser): Promise<{ linkedProviders: LinkProviderDto[] }> {
+  async getLinkProviders(user: AuthUser): Promise<{
+    linkedProviders: LinkProviderDto[]
+    providerDetails: LinkProviderDetails
+  }> {
     const identities = await this.prisma.identity.findMany({
       where: { userId: user.userId },
-      select: { provider: true },
+      select: {
+        provider: true,
+        email: true,
+        metadata: true,
+      },
     })
 
     const linkedProviders = new Set<LinkProviderDto>()
+    const providerDetails: LinkProviderDetails = {}
+
     for (const identity of identities) {
+      const metadata = asJsonObject(identity.metadata)
+
       if (identity.provider === IdentityProvider.EMAIL) {
         linkedProviders.add(LinkProviderDto.email)
+        providerDetails.email = {
+          email: identity.email ?? undefined,
+        }
       }
+
       if (identity.provider === IdentityProvider.GOOGLE) {
         linkedProviders.add(LinkProviderDto.google)
+        providerDetails.google = {
+          email: identity.email ?? undefined,
+          name: pickString(metadata, 'name'),
+        }
       }
+
       if (identity.provider === IdentityProvider.TELEGRAM) {
         linkedProviders.add(LinkProviderDto.telegram)
+        providerDetails.telegram = {
+          username: pickString(metadata, 'username'),
+          firstName: pickString(metadata, 'firstName'),
+          lastName: pickString(metadata, 'lastName'),
+        }
       }
     }
 
     return {
       linkedProviders: [...linkedProviders],
+      providerDetails,
     }
   }
 
@@ -1284,4 +1325,17 @@ function asJsonObject(value: Prisma.JsonValue | null | undefined): Record<string
   }
 
   return value as Record<string, unknown>
+}
+
+function pickString(
+  source: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = source?.[key]
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
 }

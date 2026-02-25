@@ -11,6 +11,7 @@ import { getGoogleCallbackEndpoint } from '@/lib/api'
 import { type AuthResponse, parseApiError, persistAuthProvider, persistAuthSession } from '@/lib/auth-client'
 import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '@/lib/google-identity'
 import { useTelegramMiniApp } from '@/lib/use-telegram-miniapp'
+import { useTheme } from 'next-themes'
 
 type SubmitStatus = 'idle' | 'loading' | 'success' | 'error'
 
@@ -25,6 +26,7 @@ export default function GooglePage() {
   const [selectedCredential, setSelectedCredential] = useState<string | null>(null)
   const [selectedAccountLabel, setSelectedAccountLabel] = useState<string | null>(null)
   const { isInTelegram } = useTelegramMiniApp()
+  const { resolvedTheme } = useTheme()
 
   const buttonContainerRef = useRef<HTMLDivElement | null>(null)
 
@@ -89,6 +91,8 @@ export default function GooglePage() {
         setSelectedAccountLabel(accountLabel)
         setStatus('idle')
         setError(null)
+      }, {
+        theme: resolvedTheme === 'dark' ? 'filled_black' : 'outline',
       })
       setSdkReady(true)
     }
@@ -101,7 +105,7 @@ export default function GooglePage() {
         buttonContainerRef.current.innerHTML = ''
       }
     }
-  }, [isInTelegram, selectedCredential])
+  }, [isInTelegram, resolvedTheme, selectedCredential])
 
   if (isInTelegram !== false) {
     return (
@@ -125,7 +129,7 @@ export default function GooglePage() {
 
   return (
     <AppShell session={session}>
-      <Card className="mx-auto max-w-md">
+      <Card className="mx-auto w-full max-w-md">
         <CardHeader>
           <CardTitle>{t('auth.googleTitle')}</CardTitle>
           <CardDescription>{t('auth.googleSubtitle')}</CardDescription>
@@ -136,7 +140,7 @@ export default function GooglePage() {
               {selectedAccountLabel ?? t('auth.googleSelectedFallback')}
             </Button>
           ) : (
-            <div ref={buttonContainerRef} className="min-h-10" />
+            <div ref={buttonContainerRef} className="google-signin-container min-h-10" />
           )}
 
           {!selectedCredential && !sdkReady ? <p className="text-sm text-muted-foreground">{t('common.loading')}</p> : null}
@@ -155,6 +159,7 @@ export default function GooglePage() {
 
           <div className="flex flex-wrap gap-2 pt-2">
             <Button
+              className="min-h-11"
               onClick={() => {
                 if (selectedCredential && status !== 'loading') {
                   void authenticate(selectedCredential)
@@ -167,6 +172,7 @@ export default function GooglePage() {
             {selectedCredential ? (
               <Button
                 variant="outline"
+                className="min-h-11"
                 disabled={status === 'loading'}
                 onClick={() => {
                   setSelectedCredential(null)

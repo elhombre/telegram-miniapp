@@ -17,7 +17,7 @@
   },
   "nav": {
     "welcome": "Welcome",
-    "dashboard": "Dashboard",
+    "dashboard": "Profile",
     "notes": "Notes",
     "linking": "Linked accounts",
     "login": "Sign in",
@@ -40,19 +40,27 @@
     "subtitle": "Use one user profile, switch providers, and keep all your sessions in one place.",
     "openDashboard": "Open dashboard",
     "openLogin": "Sign in",
-  "openRegister": "Create account",
-  "inTelegram": "You are inside Telegram. Session bootstrap runs automatically.",
-  "bootstrapError": "Telegram authorization failed. Please try reopening the mini app.",
-  "features": {
+    "openRegister": "Create account",
+    "openNotes": "Open notes",
+    "openProfile": "Open profile",
+    "inTelegram": "You are inside Telegram. Session bootstrap runs automatically.",
+    "bootstrapError": "Telegram authorization failed. Please try reopening the mini app.",
+    "features": {
       "title": "What you get",
       "identity": "Unified identity with explicit provider linking",
       "security": "Email verification flow for account linking",
-      "ux": "Friendly interface for both browser and Telegram"
+      "ux": "Friendly interface for both browser and Telegram",
+      "authProviders": "Three sign-in providers: Telegram, Email, Google",
+      "linking": "Explicit account linking between providers",
+      "notes": "Text notes with add and delete actions",
+      "i18n": "Built-in localization for English and Russian",
+      "theme": "Theme switch: light, dark, system",
+      "platforms": "Single experience for Telegram miniapp and standalone web"
     }
   },
   "dashboard": {
-    "title": "User dashboard",
-    "subtitle": "Manage your profile, providers, and active session.",
+    "title": "Profile",
+    "subtitle": "Manage connected providers and your active account session.",
     "telegramMenu": "Menu",
     "overview": "Overview",
     "notes": "Notes",
@@ -64,7 +72,20 @@
     "role": "Role",
     "provider": "Current provider",
     "email": "Email",
-    "sessionReady": "Active session"
+    "sessionReady": "Active session",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "activeProvider": "Active provider",
+    "manageLinking": "Manage linking",
+    "connectTelegram": "Connect Telegram",
+    "connectGoogle": "Connect Google",
+    "goToSignIn": "Go to sign in",
+    "goToRegister": "Go to register",
+    "miniappProfileHint": "Manage provider linking in standalone web mode.",
+    "linkingMovedTitle": "Linking is now part of Profile",
+    "linkingMovedDescription": "Use Profile to manage provider connections.",
+    "openProfile": "Open profile",
+    "currentSessionProvider": "Current session provider"
   },
   "notes": {
     "title": "Notes",
@@ -80,7 +101,9 @@
     "empty": "No notes yet.",
     "createdAt": "Created",
     "delete": "Delete",
-    "deleting": "Deleting..."
+    "deleting": "Deleting...",
+    "deleteConfirmTitle": "Delete note?",
+    "deleteConfirmDescription": "This action cannot be undone."
   },
   "linking": {
     "title": "Account linking",
@@ -127,6 +150,7 @@
     "passwordConfirm": "Confirm password",
     "alreadyHave": "Already have an account?",
     "noAccount": "Need an account?",
+    "linkingMode": "Linking mode",
     "passwordMismatch": "Password confirmation does not match",
     "sessionReady": "Session is ready"
   },
