@@ -78,6 +78,8 @@ export function LinkingPanel() {
   const [error, setError] = useState<string | null>(null)
 
   const [googleReady, setGoogleReady] = useState(false)
+  const [selectedGoogleIdToken, setSelectedGoogleIdToken] = useState('')
+  const [selectedGoogleAccountLabel, setSelectedGoogleAccountLabel] = useState('')
   const [telegramStatus, setTelegramStatus] = useState<TelegramLinkStatus>('idle')
   const [browserDebug, setBrowserDebug] = useState<BrowserLinkDebugState>({
     telegramStartPayload: '',
@@ -171,6 +173,15 @@ export function LinkingPanel() {
       }
     }
   }, [availableProviders, linkProvider])
+
+  useEffect(() => {
+    if (linkProvider === 'google') {
+      return
+    }
+
+    setSelectedGoogleIdToken('')
+    setSelectedGoogleAccountLabel('')
+  }, [linkProvider])
 
   const ensureLinkToken = useCallback(
     async (accessToken: string): Promise<string | null> => {
@@ -434,7 +445,7 @@ export function LinkingPanel() {
 
         const idToken = options?.googleIdToken?.trim()
         if (!idToken) {
-          throw new Error(t('linking.googleButton'))
+          throw new Error(t('linking.googleSelectFirst'))
         }
 
         const response = await fetch(getLinkConfirmEndpoint(), {
@@ -492,13 +503,19 @@ export function LinkingPanel() {
       }
 
       renderGoogleSignInButton(googleButtonRef.current, credential => {
+        const claimsPayload = decodeJwtPayloadObject(credential)
+        const accountLabel = getGoogleAccountLabel(claimsPayload, t('auth.googleSelectedFallback'))
         const googleClaimsJson = safeDecodeJwtPayload(credential)
         setBrowserDebug(currentState => ({
           ...currentState,
           googleCredential: credential,
           googleClaimsJson,
         }))
-        void confirmLink({ googleIdToken: credential })
+        setSelectedGoogleIdToken(credential)
+        setSelectedGoogleAccountLabel(accountLabel)
+        setStatus('idle')
+        setError(null)
+        setMessage(null)
       })
 
       setGoogleReady(true)
@@ -512,7 +529,7 @@ export function LinkingPanel() {
         googleButtonRef.current.innerHTML = ''
       }
     }
-  }, [confirmLink, isInTelegram, linkProvider])
+  }, [isInTelegram, linkProvider, t])
 
   return (
     <Card>
@@ -574,6 +591,11 @@ export function LinkingPanel() {
                   {GOOGLE_CLIENT_ID && !googleReady ? (
                     <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
                   ) : null}
+                  {selectedGoogleAccountLabel ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t('linking.selectedGoogle', { account: selectedGoogleAccountLabel })}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -602,8 +624,12 @@ export function LinkingPanel() {
               ) : null}
 
               {linkProvider === 'google' ? (
-                <Button variant="secondary" disabled>
-                  {t('linking.googleButton')}
+                <Button
+                  variant="secondary"
+                  onClick={() => void confirmLink({ googleIdToken: selectedGoogleIdToken })}
+                  disabled={status === 'loading' || !selectedGoogleIdToken}
+                >
+                  {t('linking.confirmGoogle')}
                 </Button>
               ) : null}
 
@@ -622,6 +648,8 @@ export function LinkingPanel() {
                   setError(null)
                   setMessage(null)
                   setStatus('idle')
+                  setSelectedGoogleIdToken('')
+                  setSelectedGoogleAccountLabel('')
                   setTelegramStatus('idle')
                 }}
               >
@@ -703,25 +731,57 @@ function getAvailableLinkProviders(
 }
 
 function safeDecodeJwtPayload(jwt: string): string {
+  const payload = decodeJwtPayloadObject(jwt)
+  if (!payload) {
+    return JSON.stringify({ parseError: 'Cannot decode JWT payload' }, null, 2)
+  }
+
+  return JSON.stringify(payload, null, 2)
+}
+
+function decodeJwtPayloadObject(jwt: string): Record<string, unknown> | null {
   const parts = jwt.split('.')
   if (parts.length < 2) {
-    return JSON.stringify({ parseError: 'Invalid JWT format' }, null, 2)
+    return null
   }
 
   try {
     const payloadSegment = parts[1]
     if (!payloadSegment) {
-      return JSON.stringify({ parseError: 'JWT payload segment is missing' }, null, 2)
+      return null
     }
 
     const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/')
     const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
     const decoded = window.atob(padded)
     const payload = JSON.parse(decoded) as unknown
-    return JSON.stringify(payload, null, 2)
+
+    if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
+      return null
+    }
+
+    return payload as Record<string, unknown>
   } catch {
-    return JSON.stringify({ parseError: 'Cannot decode JWT payload' }, null, 2)
+    return null
   }
+}
+
+function getGoogleAccountLabel(payload: Record<string, unknown> | null, fallback: string): string {
+  if (!payload) {
+    return fallback
+  }
+
+  const email = payload.email
+  if (typeof email === 'string' && email.trim()) {
+    return email.trim()
+  }
+
+  const name = payload.name
+  if (typeof name === 'string' && name.trim()) {
+    return name.trim()
+  }
+
+  return fallback
 }
 
 function buildTelegramStartPayload(input: { linkToken: string }): string {

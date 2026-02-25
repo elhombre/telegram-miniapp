@@ -657,15 +657,9 @@ export class AuthService {
       select: {
         id: true,
         userId: true,
+        metadata: true,
       },
     })
-
-    if (existingIdentity?.userId && existingIdentity.userId !== user.userId) {
-      throw new ConflictException({
-        code: 'IDENTITY_ALREADY_LINKED',
-        message: 'This identity is already linked to another account',
-      })
-    }
 
     if (existingIdentity?.userId === user.userId) {
       throw new ConflictException({
@@ -675,7 +669,23 @@ export class AuthService {
     }
 
     await this.prisma.$transaction(async tx => {
-      if (!existingIdentity) {
+      if (existingIdentity?.userId && existingIdentity.userId !== user.userId) {
+        if (provider !== IdentityProvider.GOOGLE) {
+          throw new ConflictException({
+            code: 'IDENTITY_ALREADY_LINKED',
+            message: 'This identity is already linked to another account',
+          })
+        }
+
+        await this.reassignProviderIdentityToUserInTx(tx, {
+          sourceUserId: existingIdentity.userId,
+          targetUserId: user.userId,
+          identityId: existingIdentity.id,
+          provider: IdentityProvider.GOOGLE,
+          existingMetadata: asJsonObject(existingIdentity.metadata),
+          incomingMetadata: mergedMetadata,
+        })
+      } else if (!existingIdentity) {
         const createData: Prisma.IdentityCreateInput = {
           provider,
           providerUserId,
@@ -910,10 +920,11 @@ export class AuthService {
     })
 
     if (existingIdentity?.userId && existingIdentity.userId !== input.userId) {
-      await this.reassignTelegramIdentityToUserInTx(tx, {
+      await this.reassignProviderIdentityToUserInTx(tx, {
         sourceUserId: existingIdentity.userId,
         targetUserId: input.userId,
         identityId: existingIdentity.id,
+        provider: IdentityProvider.TELEGRAM,
         existingMetadata: asJsonObject(existingIdentity.metadata),
         incomingMetadata: input.metadata,
       })
@@ -954,12 +965,13 @@ export class AuthService {
     await tx.identity.create({ data: createData })
   }
 
-  private async reassignTelegramIdentityToUserInTx(
+  private async reassignProviderIdentityToUserInTx(
     tx: Prisma.TransactionClient,
     input: {
       sourceUserId: string
       targetUserId: string
       identityId: string
+      provider: IdentityProvider
       existingMetadata?: Record<string, unknown>
       incomingMetadata?: Record<string, unknown>
     },
@@ -975,7 +987,7 @@ export class AuthService {
     const canReassignFromSourceUser =
       sourceIdentities.length === 1 &&
       sourceIdentities[0]?.id === input.identityId &&
-      sourceIdentities[0]?.provider === IdentityProvider.TELEGRAM
+      sourceIdentities[0]?.provider === input.provider
 
     if (!canReassignFromSourceUser) {
       throw new ConflictException({
@@ -987,15 +999,16 @@ export class AuthService {
     const targetTelegramIdentity = await tx.identity.findFirst({
       where: {
         userId: input.targetUserId,
-        provider: IdentityProvider.TELEGRAM,
+        provider: input.provider,
       },
       select: { id: true },
     })
 
     if (targetTelegramIdentity) {
+      const providerLabel = this.getProviderDisplayName(input.provider)
       throw new ConflictException({
         code: 'IDENTITY_ALREADY_LINKED',
-        message: 'Telegram is already linked',
+        message: `${providerLabel} is already linked`,
       })
     }
 
@@ -1025,6 +1038,18 @@ export class AuthService {
     await tx.user.delete({
       where: { id: input.sourceUserId },
     })
+  }
+
+  private getProviderDisplayName(provider: IdentityProvider): 'Telegram' | 'Google' | 'Email' {
+    if (provider === IdentityProvider.TELEGRAM) {
+      return 'Telegram'
+    }
+
+    if (provider === IdentityProvider.GOOGLE) {
+      return 'Google'
+    }
+
+    return 'Email'
   }
 
   private async assertEmailCanBeLinked(userId: string, normalizedEmail: string): Promise<void> {

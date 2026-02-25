@@ -59,6 +59,9 @@ cp apps/bot/.env.example apps/bot/.env
 - `apps/backend/.env`
   - `JWT_ACCESS_SECRET`
   - `JWT_REFRESH_SECRET`
+  - `TELEGRAM_BOT_TOKEN` (must match `apps/bot/.env`)
+  - `TELEGRAM_BOT_LINK_SECRET` (must match `apps/bot/.env`)
+  - `GOOGLE_CLIENT_ID` (must match frontend `NEXT_PUBLIC_GOOGLE_CLIENT_ID`)
   - `NOTES_MAX_LENGTH` (optional, default `2000`)
   - optional email delivery settings:
     - `EMAIL_PROVIDER=mailerlite`
@@ -75,6 +78,8 @@ cp apps/bot/.env.example apps/bot/.env
 - `apps/bot/.env`
   - `TELEGRAM_BOT_TOKEN`
   - `TELEGRAM_MINIAPP_URL`
+  - `BACKEND_API_BASE_URL`
+  - `TELEGRAM_BOT_LINK_SECRET`
 
 4. Start local infrastructure services.
 
@@ -236,7 +241,8 @@ Steps:
      - signed in with `google`: `email`, `telegram`
      - signed in with `email`: `google`, `telegram`
      - signed in with `telegram`: `email`, `google`
-   - `google`: click Google button in linking section and select account (link request is sent automatically)
+   - `google`: click Google button in linking section and select account,
+     then click `Confirm and link Google` to submit linking
    - `email`: fill email, click `Send Verification Code`, then enter 6-digit code and click `Confirm Code & Link`
    - `telegram`: click `Open Telegram and continue`, then press `Start` in bot chat,
      then press bot button `Svjazat`/`Связать` to confirm linking in bot chat
@@ -470,6 +476,8 @@ yarn workspace bot dev:webhook
   - In Telegram chat with bot, press `Start`, then press button `Svjazat`/`Связать`.
   - Ensure `TELEGRAM_BOT_LINK_SECRET` is identical in `apps/backend/.env` and `apps/bot/.env`.
   - Ensure `apps/bot/.env:BACKEND_API_BASE_URL` points to backend API prefix (example: `http://localhost:3000/api/v1`).
+  - If bot shows `Link failed: Bot backend linking integration is not configured`,
+    check both vars above and restart bot process.
   - Wait until bot shows `Telegram account linked successfully`, then wait for browser status update.
   - Keep the browser linking page open until status changes to success.
 - Telegram auth endpoint returns signature/authorization error.
