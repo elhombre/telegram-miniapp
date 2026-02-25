@@ -40,10 +40,10 @@
     "subtitle": "Use one user profile, switch providers, and keep all your sessions in one place.",
     "openDashboard": "Open dashboard",
     "openLogin": "Sign in",
-    "openRegister": "Create account",
-    "inTelegram": "You are inside Telegram. Session bootstrap runs automatically.",
-    "bootstrapError": "Telegram authorization failed. Please try reopening the mini app.",
-    "features": {
+  "openRegister": "Create account",
+  "inTelegram": "You are inside Telegram. Session bootstrap runs automatically.",
+  "bootstrapError": "Telegram authorization failed. Please try reopening the mini app.",
+  "features": {
       "title": "What you get",
       "identity": "Unified identity with explicit provider linking",
       "security": "Email verification flow for account linking",
@@ -92,6 +92,15 @@
     "confirmCode": "Confirm code and link",
     "googleButton": "Use Google button",
     "telegramButton": "Use Telegram button",
+    "confirmTelegram": "Confirm Telegram link",
+    "selectedTelegram": "Selected Telegram account: {{user}}",
+    "telegramStartButton": "Open Telegram and continue",
+    "telegramStartHint": "Open Telegram chat, press Start, then tap the bot button to confirm linking.",
+    "telegramAwaiting": "Waiting for Telegram confirmation...",
+    "telegramOpenPrompt": "Telegram opened. Confirm linking in bot chat by pressing the button.",
+    "telegramLinked": "Telegram linked successfully.",
+    "telegramExpired": "Telegram linking token expired. Start again.",
+    "telegramInvalid": "Telegram linking token is invalid.",
     "telegramHint": "If Telegram shows \"Bot domain invalid\", run /setdomain in BotFather for this domain.",
     "emailCode": "Verification code",
     "emailCodePlaceholder": "6-digit code from email",
@@ -118,5 +127,17 @@
     "noAccount": "Need an account?",
     "passwordMismatch": "Password confirmation does not match",
     "sessionReady": "Session is ready"
+  },
+  "debug": {
+    "miniAppTitle": "Debug: miniapp Telegram data",
+    "browserLinkTitle": "Debug: browser linking data",
+    "initDataRaw": "initDataRaw",
+    "parsedParams": "Parsed params",
+    "parsedUser": "Parsed user",
+    "telegramStartPayload": "Telegram start payload",
+    "telegramStartUrl": "Telegram start URL",
+    "googleCredential": "Google credential (JWT)",
+    "googleClaims": "Google claims",
+    "empty": "No data yet"
   }
 }

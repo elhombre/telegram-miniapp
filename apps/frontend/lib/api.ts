@@ -7,6 +7,9 @@ const GOOGLE_CALLBACK_PATH = 'google/callback'
 const REFRESH_SESSION_PATH = 'refresh'
 const LOGOUT_PATH = 'logout'
 const LINK_START_PATH = 'link/start'
+const LINK_TELEGRAM_START_PATH = 'link/telegram/start'
+const LINK_TELEGRAM_STATUS_PATH = 'link/telegram/status'
+const LINK_PROVIDERS_PATH = 'link/providers'
 const LINK_CONFIRM_PATH = 'link/confirm'
 const LINK_EMAIL_REQUEST_PATH = 'link/email/request'
 const LINK_EMAIL_CONFIRM_PATH = 'link/email/confirm'
@@ -38,6 +41,18 @@ export function getLogoutEndpoint(): string {
 
 export function getLinkStartEndpoint(): string {
   return getAuthEndpoint(LINK_START_PATH)
+}
+
+export function getLinkTelegramStartEndpoint(): string {
+  return getAuthEndpoint(LINK_TELEGRAM_START_PATH)
+}
+
+export function getLinkTelegramStatusEndpoint(): string {
+  return getAuthEndpoint(LINK_TELEGRAM_STATUS_PATH)
+}
+
+export function getLinkProvidersEndpoint(): string {
+  return getAuthEndpoint(LINK_PROVIDERS_PATH)
 }
 
 export function getLinkConfirmEndpoint(): string {

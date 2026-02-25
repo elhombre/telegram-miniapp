@@ -3,6 +3,7 @@ export interface StartPayload {
   ref?: string
   campaign?: string
   entityId?: string
+  linkToken?: string
   ts: number
 }
 
@@ -12,6 +13,8 @@ export interface ParseStartPayloadResult {
 }
 
 const SAFE_VALUE_REGEX = /^[A-Za-z0-9._:-]{1,128}$/
+const LINK_FLOW_PREFIX = 'l_'
+const LINK_TOKEN_REGEX = /^[A-Za-z0-9_-]{16,128}$/
 const MINIAPP_LAUNCH_PARAM = 'miniapp'
 const MINIAPP_LAUNCH_VALUE = '1'
 
@@ -24,6 +27,17 @@ export function parseStartPayload(rawPayload: string | undefined, ttlSeconds: nu
     }
   }
 
+  const compactLinkToken = parseCompactLinkToken(rawPayload)
+  if (compactLinkToken) {
+    return {
+      payload: {
+        flow: 'link_telegram',
+        linkToken: compactLinkToken,
+        ts: Math.floor(Date.now() / 1000),
+      },
+    }
+  }
+
   const parsedSearchParams = parsePayloadToSearchParams(rawPayload)
   if (!parsedSearchParams) {
     return {
@@ -31,7 +45,7 @@ export function parseStartPayload(rawPayload: string | undefined, ttlSeconds: nu
     }
   }
 
-  const allowedKeys = new Set(['flow', 'ref', 'campaign', 'entityId', 'ts'])
+  const allowedKeys = new Set(['flow', 'ref', 'campaign', 'entityId', 'linkToken', 'ts'])
   for (const key of parsedSearchParams.keys()) {
     if (!allowedKeys.has(key)) {
       return { error: `Unsupported payload key: ${key}` }
@@ -75,12 +89,18 @@ export function parseStartPayload(rawPayload: string | undefined, ttlSeconds: nu
     return { error: entityId.error }
   }
 
+  const linkToken = validateOptionalValue('linkToken', parsedSearchParams.get('linkToken'))
+  if (linkToken.error) {
+    return { error: linkToken.error }
+  }
+
   return {
     payload: {
       flow: flow.value,
       ref: ref.value,
       campaign: campaign.value,
       entityId: entityId.value,
+      linkToken: linkToken.value,
       ts,
     },
   }
@@ -101,6 +121,9 @@ export function generateStartPayload(input: Omit<StartPayload, 'ts'> & { ts?: nu
   }
   if (input.entityId) {
     params.set('entityId', input.entityId)
+  }
+  if (input.linkToken) {
+    params.set('linkToken', input.linkToken)
   }
 
   params.set('ts', String(ts))
@@ -126,6 +149,9 @@ export function buildMiniAppUrl(baseUrl: string, payload?: StartPayload): string
   }
   if (payload.entityId) {
     url.searchParams.set('entityId', payload.entityId)
+  }
+  if (payload.linkToken) {
+    url.searchParams.set('linkToken', payload.linkToken)
   }
   url.searchParams.set('ts', String(payload.ts))
 
@@ -199,4 +225,19 @@ function decodeBase64UrlToUtf8(value: string): string | undefined {
   } catch {
     return undefined
   }
+}
+
+function parseCompactLinkToken(rawPayload: string): string | undefined {
+  const value = safelyDecodeURIComponent(rawPayload).trim()
+
+  if (!value.startsWith(LINK_FLOW_PREFIX)) {
+    return undefined
+  }
+
+  const token = value.slice(LINK_FLOW_PREFIX.length)
+  if (!LINK_TOKEN_REGEX.test(token)) {
+    return undefined
+  }
+
+  return token
 }

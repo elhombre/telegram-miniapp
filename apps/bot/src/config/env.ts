@@ -7,12 +7,15 @@ export interface BotEnv {
   TELEGRAM_BOT_TOKEN: string
   TELEGRAM_MINIAPP_URL: string
   TELEGRAM_MENU_BUTTON_TEXT: string
+  TELEGRAM_LINK_CONFIRM_BUTTON_TEXT: string
   TELEGRAM_START_PAYLOAD_TTL_SECONDS: number
   TELEGRAM_WEBHOOK_BASE_URL?: string
   TELEGRAM_WEBHOOK_PATH: string
   TELEGRAM_WEBHOOK_SECRET?: string
   TELEGRAM_WEBHOOK_PORT: number
   TELEGRAM_MINIAPP_SHORT_NAME?: string
+  BACKEND_API_BASE_URL?: string
+  TELEGRAM_BOT_LINK_SECRET?: string
 }
 
 let cachedEnv: BotEnv | undefined
@@ -35,6 +38,12 @@ export function getBotEnv(rawEnv: NodeJS.ProcessEnv = process.env): BotEnv {
       'Open Mini App',
       errors,
     ),
+    TELEGRAM_LINK_CONFIRM_BUTTON_TEXT: parseNonEmptyString(
+      rawEnv.TELEGRAM_LINK_CONFIRM_BUTTON_TEXT,
+      'TELEGRAM_LINK_CONFIRM_BUTTON_TEXT',
+      'Link account',
+      errors,
+    ),
     TELEGRAM_START_PAYLOAD_TTL_SECONDS: parsePositiveInt(
       rawEnv.TELEGRAM_START_PAYLOAD_TTL_SECONDS,
       'TELEGRAM_START_PAYLOAD_TTL_SECONDS',
@@ -46,6 +55,8 @@ export function getBotEnv(rawEnv: NodeJS.ProcessEnv = process.env): BotEnv {
     TELEGRAM_WEBHOOK_SECRET: parseOptionalString(rawEnv.TELEGRAM_WEBHOOK_SECRET),
     TELEGRAM_WEBHOOK_PORT: parsePort(rawEnv.TELEGRAM_WEBHOOK_PORT, errors),
     TELEGRAM_MINIAPP_SHORT_NAME: parseOptionalString(rawEnv.TELEGRAM_MINIAPP_SHORT_NAME),
+    BACKEND_API_BASE_URL: parseOptionalUrl(rawEnv.BACKEND_API_BASE_URL, 'BACKEND_API_BASE_URL', errors),
+    TELEGRAM_BOT_LINK_SECRET: parseOptionalString(rawEnv.TELEGRAM_BOT_LINK_SECRET),
   }
 
   if (env.BOT_MODE === 'webhook') {

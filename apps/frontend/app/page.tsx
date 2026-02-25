@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppShell } from '@/components/app/app-shell'
 import { useI18n } from '@/components/app/i18n-provider'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +31,7 @@ export default function WelcomePage() {
   const [bootstrapStatus, setBootstrapStatus] = useState<BootstrapStatus>('idle')
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
   const authStartedRef = useRef(false)
+  const telegramDebug = useMemo(() => parseTelegramInitDataDebug(initDataRaw), [initDataRaw])
 
   const authorizeTelegram = useCallback(async (rawInitData: string) => {
     setBootstrapStatus('loading')
@@ -123,6 +124,34 @@ export default function WelcomePage() {
                 {bootstrapError ? ` (${bootstrapError})` : ''}
               </p>
             ) : null}
+
+            {isInTelegram === true ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">{t('debug.miniAppTitle')}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-xs">
+                  <div className="space-y-1">
+                    <p className="font-medium">{t('debug.initDataRaw')}</p>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-2">
+                      {initDataRaw || t('debug.empty')}
+                    </pre>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">{t('debug.parsedParams')}</p>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-2">
+                      {telegramDebug.paramsJson}
+                    </pre>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">{t('debug.parsedUser')}</p>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-2">
+                      {telegramDebug.userJson}
+                    </pre>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -143,4 +172,40 @@ export default function WelcomePage() {
       </div>
     </AppShell>
   )
+}
+
+function parseTelegramInitDataDebug(initDataRaw: string): {
+  paramsJson: string
+  userJson: string
+} {
+  if (!initDataRaw.trim()) {
+    return {
+      paramsJson: 'null',
+      userJson: 'null',
+    }
+  }
+
+  const params = new URLSearchParams(initDataRaw)
+  const data: Record<string, string> = {}
+
+  for (const [key, value] of params.entries()) {
+    data[key] = value
+  }
+
+  let userJson = 'null'
+  const userRaw = params.get('user')
+
+  if (userRaw) {
+    try {
+      const userPayload = JSON.parse(userRaw) as unknown
+      userJson = JSON.stringify(userPayload, null, 2)
+    } catch {
+      userJson = JSON.stringify({ parseError: 'Invalid JSON', raw: userRaw }, null, 2)
+    }
+  }
+
+  return {
+    paramsJson: JSON.stringify(data, null, 2),
+    userJson,
+  }
 }

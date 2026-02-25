@@ -6,6 +6,8 @@ import { getBotEnv } from './config/env.js'
 
 const env = getBotEnv()
 const bot = new Bot(env.TELEGRAM_BOT_TOKEN)
+const LINK_CALLBACK_PREFIX = 'link_confirm:'
+const LINK_TOKEN_REGEX = /^[A-Za-z0-9_-]{16,128}$/
 
 bot.catch(error => {
   const message = error.error instanceof Error ? error.error.message : String(error.error)
@@ -40,6 +42,15 @@ bot.command('start', async ctx => {
 
   const deepLink = buildStartAppDeepLink(botUsername, env.TELEGRAM_MINIAPP_SHORT_NAME, payloadExample)
 
+  if (parseResult.payload?.linkToken) {
+    const callbackData = `${LINK_CALLBACK_PREFIX}${parseResult.payload.linkToken}`
+    const confirmKeyboard = new InlineKeyboard().text(env.TELEGRAM_LINK_CONFIRM_BUTTON_TEXT, callbackData)
+    await ctx.reply('To complete linking, press the button below.', {
+      reply_markup: confirmKeyboard,
+    })
+    return
+  }
+
   const details: string[] = [
     'Mini App is ready.',
     `Launch URL: ${miniAppUrl}`,
@@ -73,6 +84,45 @@ bot.command('link', async ctx => {
   }
 
   await ctx.reply(`Startapp deep link:\n${deepLink}`)
+})
+
+bot.callbackQuery(new RegExp(`^${LINK_CALLBACK_PREFIX}(.+)$`), async ctx => {
+  const linkToken = ctx.match?.[1]?.trim()
+  if (!linkToken || !LINK_TOKEN_REGEX.test(linkToken) || !ctx.from) {
+    await ctx.answerCallbackQuery({
+      text: 'Invalid linking payload',
+      show_alert: true,
+    })
+    return
+  }
+
+  const linkResult = await confirmTelegramLinkViaBackend(linkToken, ctx.from)
+
+  if (!linkResult.success) {
+    await ctx.answerCallbackQuery({
+      text: `Link failed: ${linkResult.message}`,
+      show_alert: true,
+    })
+    return
+  }
+
+  await ctx.answerCallbackQuery({
+    text: 'Linked successfully',
+    show_alert: false,
+  })
+
+  const miniAppUrl = buildMiniAppUrl(env.TELEGRAM_MINIAPP_URL)
+  const openKeyboard = new InlineKeyboard().webApp(env.TELEGRAM_MENU_BUTTON_TEXT, miniAppUrl)
+
+  try {
+    await ctx.editMessageText('Telegram account linked successfully. Return to browser.', {
+      reply_markup: openKeyboard,
+    })
+  } catch {
+    await ctx.reply('Telegram account linked successfully. Return to browser.', {
+      reply_markup: openKeyboard,
+    })
+  }
 })
 
 async function bootstrap() {
@@ -185,6 +235,79 @@ function extractStartPayload(text: string | undefined): string | undefined {
   }
 
   return parts.slice(1).join(' ')
+}
+
+async function confirmTelegramLinkViaBackend(
+  linkToken: string,
+  user: {
+    id: number
+    username?: string
+    first_name?: string
+    last_name?: string
+    language_code?: string
+  },
+): Promise<{ success: true } | { success: false; message: string }> {
+  if (!env.BACKEND_API_BASE_URL || !env.TELEGRAM_BOT_LINK_SECRET) {
+    return {
+      success: false,
+      message: 'Bot backend linking integration is not configured',
+    }
+  }
+
+  const endpoint = `${env.BACKEND_API_BASE_URL.replace(/\/+$/, '')}/auth/link/telegram/bot-confirm`
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-bot-link-secret': env.TELEGRAM_BOT_LINK_SECRET,
+      },
+      body: JSON.stringify({
+        linkToken,
+        telegramUserId: String(user.id),
+        username: user.username,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        languageCode: user.language_code,
+      }),
+    })
+
+    if (response.ok) {
+      return { success: true }
+    }
+
+    const responseText = await response.text()
+    const parsed = safeParseJson(responseText)
+    const message = extractErrorMessage(parsed) ?? `HTTP ${response.status}`
+
+    return {
+      success: false,
+      message,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+function safeParseJson(rawValue: string): unknown {
+  try {
+    return JSON.parse(rawValue) as unknown
+  } catch {
+    return rawValue
+  }
+}
+
+function extractErrorMessage(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const message = (value as Record<string, unknown>).message
+  return typeof message === 'string' && message.trim() ? message : undefined
 }
 
 void bootstrap().catch(error => {

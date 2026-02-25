@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common'
 import { UserRole } from '../generated/prisma/client'
 import type { Request } from 'express'
 import { AUTH_RATE_LIMIT_POLICIES } from '../common/rate-limit/policies/auth-rate-limit.policies'
@@ -20,6 +20,10 @@ import { LinkEmailConfirmDto } from './dto/link-email-confirm.dto'
 // biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { LinkEmailRequestDto } from './dto/link-email-request.dto'
 // biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
+import { LinkTelegramBotConfirmDto } from './dto/link-telegram-bot-confirm.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
+import { LinkTelegramStatusDto } from './dto/link-telegram-status.dto'
+// biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { LinkConfirmDto } from './dto/link-confirm.dto'
 // biome-ignore lint/style/useImportType: Nest validation metadata requires DTO runtime class reference.
 import { LogoutDto } from './dto/logout.dto'
@@ -33,6 +37,8 @@ import type { AuthUser } from './types/auth-user.type'
 
 @Controller('auth')
 export class AuthController {
+  private readonly botLinkSecret = process.env.TELEGRAM_BOT_LINK_SECRET?.trim()
+
   constructor(
     private readonly authService: AuthService,
     private readonly rateLimitService: RateLimitService,
@@ -103,6 +109,35 @@ export class AuthController {
     return this.authService.startLink(user)
   }
 
+  @Post('link/telegram/start')
+  @UseGuards(AccessTokenGuard, RolesGuard)
+  @Roles(UserRole.USER, UserRole.ADMIN)
+  async startTelegramLink(@CurrentUser() user: AuthUser, @Req() request: Request) {
+    await this.rateLimitService.assert(AUTH_RATE_LIMIT_POLICIES.LINK_START, {
+      request,
+      userId: user.userId,
+    })
+    return this.authService.startTelegramLink(user)
+  }
+
+  @Post('link/telegram/status')
+  @UseGuards(AccessTokenGuard, RolesGuard)
+  @Roles(UserRole.USER, UserRole.ADMIN)
+  async getTelegramLinkStatus(@CurrentUser() user: AuthUser, @Body() dto: LinkTelegramStatusDto, @Req() request: Request) {
+    await this.rateLimitService.assert(AUTH_RATE_LIMIT_POLICIES.LINK_TELEGRAM_STATUS, {
+      request,
+      userId: user.userId,
+    })
+    return this.authService.getTelegramLinkStatus(user, dto)
+  }
+
+  @Get('link/providers')
+  @UseGuards(AccessTokenGuard, RolesGuard)
+  @Roles(UserRole.USER, UserRole.ADMIN)
+  async getLinkProviders(@CurrentUser() user: AuthUser) {
+    return this.authService.getLinkProviders(user)
+  }
+
   @Post('link/confirm')
   @UseGuards(AccessTokenGuard, RolesGuard)
   @Roles(UserRole.USER, UserRole.ADMIN)
@@ -136,5 +171,28 @@ export class AuthController {
       email: dto.email,
     })
     return this.authService.confirmEmailLink(user, dto)
+  }
+
+  @Post('link/telegram/bot-confirm')
+  @Public()
+  async confirmTelegramLinkFromBot(@Body() dto: LinkTelegramBotConfirmDto, @Req() request: Request) {
+    await this.rateLimitService.assert(AUTH_RATE_LIMIT_POLICIES.LINK_TELEGRAM_BOT_CONFIRM, { request })
+
+    if (!this.botLinkSecret) {
+      throw new UnauthorizedException({
+        code: 'BOT_LINK_SECRET_NOT_CONFIGURED',
+        message: 'Bot link secret is not configured',
+      })
+    }
+
+    const receivedSecret = request.header('x-bot-link-secret')?.trim()
+    if (!receivedSecret || receivedSecret !== this.botLinkSecret) {
+      throw new UnauthorizedException({
+        code: 'INVALID_BOT_LINK_SECRET',
+        message: 'Bot link secret is invalid',
+      })
+    }
+
+    return this.authService.confirmTelegramLinkFromBot(dto)
   }
 }

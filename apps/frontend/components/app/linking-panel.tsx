@@ -11,24 +11,28 @@ import {
   getLinkConfirmEndpoint,
   getLinkEmailConfirmEndpoint,
   getLinkEmailRequestEndpoint,
+  getLinkProvidersEndpoint,
   getLinkStartEndpoint,
+  getLinkTelegramStartEndpoint,
+  getLinkTelegramStatusEndpoint,
 } from '@/lib/api'
 import { type AuthProvider, parseApiError, readStoredAccessToken, readStoredAuthProvider } from '@/lib/auth-client'
 import { GOOGLE_CLIENT_ID, loadGoogleIdentityScript, renderGoogleSignInButton } from '@/lib/google-identity'
-import {
-  TELEGRAM_BOT_PUBLIC_NAME,
-  buildTelegramLoginWidgetAuthDataRaw,
-  renderTelegramLoginWidget,
-} from '@/lib/telegram-login-widget'
+import { TELEGRAM_BOT_PUBLIC_NAME } from '@/lib/telegram-login-widget'
 import { useTelegramMiniApp } from '@/lib/use-telegram-miniapp'
 import { useI18n } from './i18n-provider'
 
 type LinkProvider = 'email' | 'google' | 'telegram'
 type LinkStatus = 'idle' | 'loading' | 'success' | 'error'
+type TelegramLinkStatus = 'idle' | 'pending' | 'linked' | 'expired' | 'invalid'
 
 interface LinkStartResponse {
   linkToken: string
   expiresAt: string
+}
+
+interface LinkProvidersResponse {
+  linkedProviders?: LinkProvider[]
 }
 
 interface LinkEmailRequestResponse {
@@ -43,6 +47,17 @@ interface LinkConfirmResponse {
   provider: LinkProvider
 }
 
+interface TelegramLinkStatusResponse {
+  status: TelegramLinkStatus
+}
+
+interface BrowserLinkDebugState {
+  telegramStartPayload: string
+  telegramStartUrl: string
+  googleCredential: string
+  googleClaimsJson: string
+}
+
 export function LinkingPanel() {
   const { t } = useI18n()
   const searchParams = useSearchParams()
@@ -50,6 +65,7 @@ export function LinkingPanel() {
 
   const { isInTelegram } = useTelegramMiniApp()
   const [currentAuthProvider, setCurrentAuthProvider] = useState<AuthProvider | null>(null)
+  const [linkedProviders, setLinkedProviders] = useState<LinkProvider[]>([])
 
   const [linkProvider, setLinkProvider] = useState<LinkProvider>('email')
   const [linkToken, setLinkToken] = useState('')
@@ -62,14 +78,50 @@ export function LinkingPanel() {
   const [error, setError] = useState<string | null>(null)
 
   const [googleReady, setGoogleReady] = useState(false)
-  const [telegramReady, setTelegramReady] = useState(false)
+  const [telegramStatus, setTelegramStatus] = useState<TelegramLinkStatus>('idle')
+  const [browserDebug, setBrowserDebug] = useState<BrowserLinkDebugState>({
+    telegramStartPayload: '',
+    telegramStartUrl: '',
+    googleCredential: '',
+    googleClaimsJson: '',
+  })
 
   const googleButtonRef = useRef<HTMLDivElement | null>(null)
-  const telegramButtonRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setCurrentAuthProvider(readStoredAuthProvider())
   }, [])
+
+  const loadLinkedProviders = useCallback(async () => {
+    const accessToken = readStoredAccessToken()
+    if (!accessToken) {
+      setLinkedProviders([])
+      return
+    }
+
+    try {
+      const response = await fetch(getLinkProvidersEndpoint(), {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
+      }
+
+      const payload = (await response.json()) as LinkProvidersResponse
+      const providers = payload.linkedProviders ?? []
+      setLinkedProviders(providers)
+    } catch {
+      // Do not block the UI if this call fails.
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadLinkedProviders()
+  }, [loadLinkedProviders])
 
   useEffect(() => {
     if (!searchParams) {
@@ -106,7 +158,10 @@ export function LinkingPanel() {
     router.replace('/dashboard/linking')
   }, [router, searchParams, t])
 
-  const availableProviders = useMemo(() => getAvailableLinkProviders(currentAuthProvider), [currentAuthProvider])
+  const availableProviders = useMemo(
+    () => getAvailableLinkProviders(currentAuthProvider, linkedProviders),
+    [currentAuthProvider, linkedProviders],
+  )
 
   useEffect(() => {
     if (availableProviders.length > 0 && !availableProviders.includes(linkProvider)) {
@@ -155,6 +210,65 @@ export function LinkingPanel() {
     },
     [linkToken, linkTokenExpiresAt],
   )
+
+  const checkTelegramStatus = useCallback(async (rawLinkToken: string) => {
+    const accessToken = readStoredAccessToken()
+    if (!accessToken) {
+      setTelegramStatus('invalid')
+      return
+    }
+
+    try {
+      const response = await fetch(getLinkTelegramStatusEndpoint(), {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          linkToken: rawLinkToken,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
+      }
+
+      const payload = (await response.json()) as TelegramLinkStatusResponse
+      setTelegramStatus(payload.status)
+
+      if (payload.status === 'linked') {
+        setStatus('success')
+        setMessage(t('linking.telegramLinked'))
+        setError(null)
+        await loadLinkedProviders()
+      } else if (payload.status === 'expired') {
+        setStatus('error')
+        setError(t('linking.telegramExpired'))
+      } else if (payload.status === 'invalid') {
+        setStatus('error')
+        setError(t('linking.telegramInvalid'))
+      }
+    } catch (statusError) {
+      const statusErrorMessage = statusError instanceof Error ? statusError.message : String(statusError)
+      setStatus('error')
+      setError(statusErrorMessage)
+    }
+  }, [loadLinkedProviders, t])
+
+  useEffect(() => {
+    if (!linkToken || telegramStatus !== 'pending') {
+      return
+    }
+
+    const timerId = window.setInterval(() => {
+      void checkTelegramStatus(linkToken)
+    }, 2_000)
+
+    return () => {
+      window.clearInterval(timerId)
+    }
+  }, [checkTelegramStatus, linkToken, telegramStatus])
 
   const requestEmailCode = useCallback(async () => {
     const accessToken = readStoredAccessToken()
@@ -211,8 +325,70 @@ export function LinkingPanel() {
     }
   }, [ensureLinkToken, linkEmail, t])
 
+  const startTelegramLink = useCallback(async () => {
+    const accessToken = readStoredAccessToken()
+    if (!accessToken) {
+      setStatus('error')
+      setError('Access token is required')
+      setMessage(null)
+      return
+    }
+
+    setStatus('loading')
+    setError(null)
+    setMessage(null)
+
+    try {
+      const response = await fetch(getLinkTelegramStartEndpoint(), {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+        body: '{}',
+      })
+
+      if (!response.ok) {
+        throw new Error(await parseApiError(response))
+      }
+
+      const payload = (await response.json()) as LinkStartResponse
+      setLinkToken(payload.linkToken)
+      setLinkTokenExpiresAt(payload.expiresAt)
+
+      const startPayload = buildTelegramStartPayload({
+        linkToken: payload.linkToken,
+      })
+      const startUrl = buildTelegramStartUrl(TELEGRAM_BOT_PUBLIC_NAME, startPayload)
+
+      if (!startUrl) {
+        throw new Error('NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME must be a valid bot username')
+      }
+
+      setBrowserDebug(currentState => ({
+        ...currentState,
+        telegramStartPayload: startPayload,
+        telegramStartUrl: startUrl,
+      }))
+
+      setTelegramStatus('pending')
+      setStatus('success')
+      setMessage(t('linking.telegramOpenPrompt'))
+
+      if (typeof window !== 'undefined') {
+        window.open(startUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch (startError) {
+      const startErrorMessage = startError instanceof Error ? startError.message : String(startError)
+      setStatus('error')
+      setError(startErrorMessage)
+      setMessage(null)
+      setTelegramStatus('idle')
+    }
+  }, [t])
+
   const confirmLink = useCallback(
-    async (options?: { googleIdToken?: string; telegramAuthDataRaw?: string }) => {
+    async (options?: { googleIdToken?: string }) => {
       const accessToken = readStoredAccessToken()
       if (!accessToken) {
         setStatus('error')
@@ -252,34 +428,13 @@ export function LinkingPanel() {
           const payload = (await response.json()) as LinkConfirmResponse
           setStatus('success')
           setMessage(t('linking.linked', { provider: payload.provider }))
+          await loadLinkedProviders()
           return
         }
 
-        const requestBody: {
-          linkToken: string
-          provider: 'google' | 'telegram'
-          idToken?: string
-          initDataRaw?: string
-        } = {
-          linkToken: ensuredToken,
-          provider: linkProvider === 'google' ? 'google' : 'telegram',
-        }
-
-        if (linkProvider === 'google') {
-          const idToken = options?.googleIdToken?.trim()
-          if (!idToken) {
-            throw new Error(t('linking.googleButton'))
-          }
-          requestBody.idToken = idToken
-        }
-
-        if (linkProvider === 'telegram') {
-          const initDataRaw = options?.telegramAuthDataRaw?.trim()
-          if (!initDataRaw) {
-            throw new Error(t('linking.telegramButton'))
-          }
-
-          requestBody.initDataRaw = initDataRaw
+        const idToken = options?.googleIdToken?.trim()
+        if (!idToken) {
+          throw new Error(t('linking.googleButton'))
         }
 
         const response = await fetch(getLinkConfirmEndpoint(), {
@@ -288,7 +443,11 @@ export function LinkingPanel() {
             authorization: `Bearer ${accessToken}`,
             'content-type': 'application/json',
           },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify({
+            linkToken: ensuredToken,
+            provider: 'google',
+            idToken,
+          }),
         })
 
         if (!response.ok) {
@@ -298,6 +457,7 @@ export function LinkingPanel() {
         const payload = (await response.json()) as LinkConfirmResponse
         setStatus('success')
         setMessage(t('linking.linked', { provider: payload.provider }))
+        await loadLinkedProviders()
       } catch (linkError) {
         const linkMessage = linkError instanceof Error ? linkError.message : String(linkError)
         setStatus('error')
@@ -305,7 +465,7 @@ export function LinkingPanel() {
         setMessage(null)
       }
     },
-    [ensureLinkToken, linkEmail, linkEmailCode, linkProvider, t],
+    [ensureLinkToken, linkEmail, linkEmailCode, linkProvider, loadLinkedProviders, t],
   )
 
   useEffect(() => {
@@ -332,6 +492,12 @@ export function LinkingPanel() {
       }
 
       renderGoogleSignInButton(googleButtonRef.current, credential => {
+        const googleClaimsJson = safeDecodeJwtPayload(credential)
+        setBrowserDebug(currentState => ({
+          ...currentState,
+          googleCredential: credential,
+          googleClaimsJson,
+        }))
         void confirmLink({ googleIdToken: credential })
       })
 
@@ -344,35 +510,6 @@ export function LinkingPanel() {
       cancelled = true
       if (googleButtonRef.current) {
         googleButtonRef.current.innerHTML = ''
-      }
-    }
-  }, [confirmLink, isInTelegram, linkProvider])
-
-  useEffect(() => {
-    if (linkProvider !== 'telegram' || isInTelegram !== false || !TELEGRAM_BOT_PUBLIC_NAME || !telegramButtonRef.current) {
-      setTelegramReady(false)
-      return
-    }
-
-    let cleanup: (() => void) | undefined
-
-    try {
-      cleanup = renderTelegramLoginWidget(telegramButtonRef.current, user => {
-        const authDataRaw = buildTelegramLoginWidgetAuthDataRaw(user)
-        void confirmLink({ telegramAuthDataRaw: authDataRaw })
-      })
-      setTelegramReady(true)
-    } catch (widgetError) {
-      const widgetMessage = widgetError instanceof Error ? widgetError.message : String(widgetError)
-      setError(widgetMessage)
-      setTelegramReady(false)
-      return
-    }
-
-    return () => {
-      cleanup?.()
-      if (telegramButtonRef.current) {
-        telegramButtonRef.current.innerHTML = ''
       }
     }
   }, [confirmLink, isInTelegram, linkProvider])
@@ -443,9 +580,9 @@ export function LinkingPanel() {
               {linkProvider === 'telegram' ? (
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Telegram</Label>
-                  <div ref={telegramButtonRef} className="min-h-10" />
-                  {TELEGRAM_BOT_PUBLIC_NAME && !telegramReady ? (
-                    <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
+                  <p className="text-sm text-muted-foreground">{t('linking.telegramStartHint')}</p>
+                  {telegramStatus === 'pending' ? (
+                    <p className="text-sm text-muted-foreground">{t('linking.telegramAwaiting')}</p>
                   ) : null}
                   <p className="text-xs text-muted-foreground">{t('linking.telegramHint')}</p>
                 </div>
@@ -471,8 +608,8 @@ export function LinkingPanel() {
               ) : null}
 
               {linkProvider === 'telegram' ? (
-                <Button variant="secondary" disabled>
-                  {t('linking.telegramButton')}
+                <Button variant="secondary" onClick={() => void startTelegramLink()} disabled={status === 'loading'}>
+                  {t('linking.telegramStartButton')}
                 </Button>
               ) : null}
 
@@ -485,6 +622,7 @@ export function LinkingPanel() {
                   setError(null)
                   setMessage(null)
                   setStatus('idle')
+                  setTelegramStatus('idle')
                 }}
               >
                 {t('linking.reset')}
@@ -503,23 +641,111 @@ export function LinkingPanel() {
             {t('common.error')}: {error}
           </p>
         ) : null}
+
+        {isInTelegram === false ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('debug.browserLinkTitle')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-xs">
+              <div className="space-y-1">
+                <p className="font-medium">{t('debug.telegramStartPayload')}</p>
+                <pre className="overflow-x-auto rounded-md bg-muted p-2">
+                  {browserDebug.telegramStartPayload || t('debug.empty')}
+                </pre>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium">{t('debug.telegramStartUrl')}</p>
+                <pre className="overflow-x-auto rounded-md bg-muted p-2">
+                  {browserDebug.telegramStartUrl || t('debug.empty')}
+                </pre>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium">{t('debug.googleCredential')}</p>
+                <pre className="overflow-x-auto rounded-md bg-muted p-2">
+                  {browserDebug.googleCredential || t('debug.empty')}
+                </pre>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium">{t('debug.googleClaims')}</p>
+                <pre className="overflow-x-auto rounded-md bg-muted p-2">
+                  {browserDebug.googleClaimsJson || t('debug.empty')}
+                </pre>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </CardContent>
     </Card>
   )
 }
 
-function getAvailableLinkProviders(currentProvider: AuthProvider | null): LinkProvider[] {
+function getAvailableLinkProviders(
+  currentProvider: AuthProvider | null,
+  linkedProviders: LinkProvider[],
+): LinkProvider[] {
   if (!currentProvider) {
     return []
   }
 
+  const alreadyLinked = new Set(linkedProviders)
+
+  let candidates: LinkProvider[] = []
   if (currentProvider === 'google') {
-    return ['email', 'telegram']
+    candidates = ['email', 'telegram']
+  } else if (currentProvider === 'email') {
+    candidates = ['google', 'telegram']
+  } else {
+    candidates = ['email', 'google']
   }
 
-  if (currentProvider === 'email') {
-    return ['google', 'telegram']
+  return candidates.filter(provider => !alreadyLinked.has(provider))
+}
+
+function safeDecodeJwtPayload(jwt: string): string {
+  const parts = jwt.split('.')
+  if (parts.length < 2) {
+    return JSON.stringify({ parseError: 'Invalid JWT format' }, null, 2)
   }
 
-  return ['email', 'google']
+  try {
+    const payloadSegment = parts[1]
+    if (!payloadSegment) {
+      return JSON.stringify({ parseError: 'JWT payload segment is missing' }, null, 2)
+    }
+
+    const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+    const decoded = window.atob(padded)
+    const payload = JSON.parse(decoded) as unknown
+    return JSON.stringify(payload, null, 2)
+  } catch {
+    return JSON.stringify({ parseError: 'Cannot decode JWT payload' }, null, 2)
+  }
+}
+
+function buildTelegramStartPayload(input: { linkToken: string }): string {
+  return `l_${input.linkToken}`
+}
+
+function buildTelegramStartUrl(rawBotPublicName: string, payload: string): string | null {
+  const botUsername = normalizeBotUsername(rawBotPublicName)
+  if (!botUsername) {
+    return null
+  }
+
+  return `https://t.me/${botUsername}?start=${encodeURIComponent(payload)}`
+}
+
+function normalizeBotUsername(rawValue: string): string | null {
+  const value = rawValue.trim().replace(/^@/, '')
+  if (!value) {
+    return null
+  }
+
+  if (!/^[a-zA-Z0-9_]{5,}$/.test(value)) {
+    return null
+  }
+
+  return value
 }

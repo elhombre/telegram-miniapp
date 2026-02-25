@@ -6,6 +6,8 @@ export const AUTH_RATE_LIMIT_POLICIES = {
   REFRESH: 'refresh',
   LOGOUT: 'logout',
   LINK_START: 'link_start',
+  LINK_TELEGRAM_STATUS: 'link_telegram_status',
+  LINK_TELEGRAM_BOT_CONFIRM: 'link_telegram_bot_confirm',
   LINK_CONFIRM: 'link_confirm',
   LINK_EMAIL_REQUEST: 'link_email_request',
   LINK_EMAIL_CONFIRM: 'link_email_confirm',
@@ -109,6 +111,22 @@ export const POLICY_RULES: Record<AuthRateLimitPolicy, RateLimitRule[]> = {
       limit: 10,
       windowMs: 15 * 60_000,
       key: context => context.userId,
+    },
+  ],
+  link_telegram_status: [
+    {
+      id: 'link_telegram_status_user',
+      limit: 180,
+      windowMs: 60_000,
+      key: context => context.userId,
+    },
+  ],
+  link_telegram_bot_confirm: [
+    {
+      id: 'link_telegram_bot_confirm_ip',
+      limit: 120,
+      windowMs: 60_000,
+      key: context => context.ip,
     },
   ],
   link_confirm: [

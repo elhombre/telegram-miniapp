@@ -15,6 +15,7 @@ export interface AppEnv {
   ACCESS_TOKEN_TTL_SECONDS: number
   REFRESH_TOKEN_TTL_DAYS: number
   TELEGRAM_BOT_TOKEN?: string
+  TELEGRAM_BOT_LINK_SECRET?: string
   TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: number
   GOOGLE_CLIENT_ID?: string
   ACCOUNT_LINK_TOKEN_TTL_MINUTES: number
@@ -56,6 +57,7 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
     ),
     REFRESH_TOKEN_TTL_DAYS: parsePositiveInt(rawEnv.REFRESH_TOKEN_TTL_DAYS, 'REFRESH_TOKEN_TTL_DAYS', 30, errors),
     TELEGRAM_BOT_TOKEN: parseOptionalString(rawEnv.TELEGRAM_BOT_TOKEN),
+    TELEGRAM_BOT_LINK_SECRET: parseOptionalString(rawEnv.TELEGRAM_BOT_LINK_SECRET),
     TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: parsePositiveInt(
       rawEnv.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS,
       'TELEGRAM_INIT_DATA_MAX_AGE_SECONDS',

@@ -7,9 +7,11 @@ Telegram bot runtime for Phase-2.
 - `/start` command
 - menu button registration (`web_app`)
 - inline web app launch button
+- explicit link confirmation button for Telegram linking flow
 - launch URL marker `miniapp=1` for stable frontend miniapp mode detection
 - start payload parsing with TTL checks (`flow`, `ref`, `campaign`, `entityId`, `ts`)
 - payload/deep-link generation via `/link`
+- telegram linking confirmation via bot button callback (`/start` payload with `linkToken`)
 - `polling` mode (local)
 - `webhook` mode (production)
 
@@ -19,6 +21,9 @@ Copy `.env.example` to `.env` and set at least:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_MINIAPP_URL`
+- `TELEGRAM_LINK_CONFIRM_BUTTON_TEXT` (text for explicit link button, example: `Связать`)
+- `BACKEND_API_BASE_URL` (for link confirmation callback)
+- `TELEGRAM_BOT_LINK_SECRET` (must match backend `TELEGRAM_BOT_LINK_SECRET`)
 
 For webhook mode also set:
 

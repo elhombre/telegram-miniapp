@@ -6,6 +6,10 @@ interface ProxyAuthPostOptions {
   forwardAuthorizationHeader?: boolean
 }
 
+interface ProxyAuthGetOptions {
+  forwardAuthorizationHeader?: boolean
+}
+
 export async function proxyAuthPost(request: Request, authPath: string, options: ProxyAuthPostOptions = {}) {
   const backendUrl = resolveBackendAuthUrl(authPath)
 
@@ -48,6 +52,59 @@ export async function proxyAuthPost(request: Request, authPath: string, options:
       method: 'POST',
       headers,
       body: requestBodyRaw,
+      cache: 'no-store',
+    })
+
+    const responseText = await upstreamResponse.text()
+    const responseContentType = upstreamResponse.headers.get('content-type') ?? 'application/json'
+
+    if (responseContentType.includes('application/json')) {
+      const payload = responseText.trim() ? safeParseJson(responseText) : {}
+      return NextResponse.json(payload, { status: upstreamResponse.status })
+    }
+
+    return new NextResponse(responseText, {
+      status: upstreamResponse.status,
+      headers: {
+        'content-type': responseContentType,
+      },
+    })
+  } catch {
+    return NextResponse.json(
+      {
+        code: 'BACKEND_UNAVAILABLE',
+        message: 'Cannot reach backend API',
+      },
+      { status: 502 },
+    )
+  }
+}
+
+export async function proxyAuthGet(request: Request, authPath: string, options: ProxyAuthGetOptions = {}) {
+  const backendUrl = resolveBackendAuthUrl(authPath)
+
+  if (!backendUrl) {
+    return NextResponse.json(
+      {
+        code: 'INVALID_BACKEND_API_BASE_URL',
+        message: 'Backend API base URL is not configured correctly',
+      },
+      { status: 500 },
+    )
+  }
+
+  try {
+    const headers: Record<string, string> = {}
+    if (options.forwardAuthorizationHeader) {
+      const authorization = request.headers.get('authorization')
+      if (authorization) {
+        headers.authorization = authorization
+      }
+    }
+
+    const upstreamResponse = await fetch(backendUrl, {
+      method: 'GET',
+      headers,
       cache: 'no-store',
     })
 

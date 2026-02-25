@@ -20,6 +20,8 @@ import type { EmailRegisterDto } from './dto/email-register.dto'
 import type { GoogleCallbackDto } from './dto/google-callback.dto'
 import type { LinkEmailConfirmDto } from './dto/link-email-confirm.dto'
 import type { LinkEmailRequestDto } from './dto/link-email-request.dto'
+import type { LinkTelegramBotConfirmDto } from './dto/link-telegram-bot-confirm.dto'
+import type { LinkTelegramStatusDto } from './dto/link-telegram-status.dto'
 import { type LinkConfirmDto, LinkProviderDto } from './dto/link-confirm.dto'
 // biome-ignore lint/style/useImportType: Nest DI requires runtime class reference.
 import { EmailSenderService } from './email-sender.service'
@@ -48,6 +50,12 @@ interface UserContext {
   id: string
   role: UserRole
   email: string | null
+}
+
+interface ActiveLinkToken {
+  id: string
+  userId: string
+  expiresAt: Date
 }
 
 @Injectable()
@@ -367,7 +375,7 @@ export class AuthService {
   }
 
   async startLink(user: AuthUser): Promise<{ linkToken: string; expiresAt: string }> {
-    const rawToken = this.generateSecureToken()
+    const rawToken = this.generateSecureToken(24)
     const tokenHash = this.hashToken(rawToken)
     const expiresAt = new Date(Date.now() + this.env.ACCOUNT_LINK_TOKEN_TTL_MINUTES * 60 * 1000)
 
@@ -382,6 +390,92 @@ export class AuthService {
     return {
       linkToken: rawToken,
       expiresAt: expiresAt.toISOString(),
+    }
+  }
+
+  async startTelegramLink(user: AuthUser): Promise<{ linkToken: string; expiresAt: string }> {
+    await this.assertTelegramCanBeLinked(user.userId)
+    return this.startLink(user)
+  }
+
+  async getLinkProviders(user: AuthUser): Promise<{ linkedProviders: LinkProviderDto[] }> {
+    const identities = await this.prisma.identity.findMany({
+      where: { userId: user.userId },
+      select: { provider: true },
+    })
+
+    const linkedProviders = new Set<LinkProviderDto>()
+    for (const identity of identities) {
+      if (identity.provider === IdentityProvider.EMAIL) {
+        linkedProviders.add(LinkProviderDto.email)
+      }
+      if (identity.provider === IdentityProvider.GOOGLE) {
+        linkedProviders.add(LinkProviderDto.google)
+      }
+      if (identity.provider === IdentityProvider.TELEGRAM) {
+        linkedProviders.add(LinkProviderDto.telegram)
+      }
+    }
+
+    return {
+      linkedProviders: [...linkedProviders],
+    }
+  }
+
+  async getTelegramLinkStatus(
+    user: AuthUser,
+    dto: LinkTelegramStatusDto,
+  ): Promise<{ status: 'pending' | 'linked' | 'expired' | 'invalid' }> {
+    const linkToken = await this.resolveLinkTokenByRawToken(dto.linkToken)
+    if (!linkToken || linkToken.userId !== user.userId) {
+      return { status: 'invalid' }
+    }
+
+    if (linkToken.consumedAt) {
+      const hasTelegramIdentity = await this.hasTelegramIdentity(user.userId)
+      return { status: hasTelegramIdentity ? 'linked' : 'invalid' }
+    }
+
+    if (linkToken.expiresAt.getTime() <= Date.now()) {
+      return { status: 'expired' }
+    }
+
+    return { status: 'pending' }
+  }
+
+  async confirmTelegramLinkFromBot(dto: LinkTelegramBotConfirmDto): Promise<{ linked: true; provider: LinkProviderDto }> {
+    const linkToken = await this.resolveActiveLinkTokenByRawToken(dto.linkToken)
+    const providerUserId = dto.telegramUserId.trim()
+
+    if (!providerUserId) {
+      throw new BadRequestException({
+        code: 'PROVIDER_USER_ID_REQUIRED',
+        message: 'Telegram user id is required',
+      })
+    }
+
+    await this.prisma.$transaction(async tx => {
+      await this.linkTelegramIdentityInTx(tx, {
+        userId: linkToken.userId,
+        providerUserId,
+        metadata: {
+          username: dto.username,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          languageCode: dto.languageCode,
+          linkedVia: 'bot_confirm_button',
+        },
+      })
+
+      await tx.accountLinkToken.update({
+        where: { id: linkToken.id },
+        data: { consumedAt: new Date() },
+      })
+    })
+
+    return {
+      linked: true,
+      provider: LinkProviderDto.telegram,
     }
   }
 
@@ -512,6 +606,13 @@ export class AuthService {
       })
     }
 
+    if (dto.provider === LinkProviderDto.telegram) {
+      throw new BadRequestException({
+        code: 'TELEGRAM_LINK_BOT_CONFIRM_REQUIRED',
+        message: 'Use Telegram bot confirmation flow for Telegram linking',
+      })
+    }
+
     const linkToken = await this.resolveActiveLinkToken(user.userId, dto.linkToken)
 
     const provider = this.mapLinkProvider(dto.provider)
@@ -534,18 +635,6 @@ export class AuthService {
       }
     }
 
-    if (dto.provider === LinkProviderDto.telegram && dto.initDataRaw?.trim()) {
-      const telegramUser = this.verifyTelegramLinkAuthData(dto.initDataRaw)
-      verifiedProviderUserId = String(telegramUser.id)
-      providerMetadata = {
-        username: telegramUser.username,
-        firstName: telegramUser.first_name,
-        lastName: telegramUser.last_name,
-        languageCode: telegramUser.language_code,
-        isPremium: telegramUser.is_premium,
-      }
-    }
-
     const providerUserId = this.resolveProviderUserId(
       dto.provider,
       dto.providerUserId,
@@ -553,6 +642,10 @@ export class AuthService {
       verifiedProviderUserId,
     )
     const mergedMetadata = this.mergeLinkMetadata(dto.metadata, providerMetadata)
+
+    if (provider === IdentityProvider.TELEGRAM) {
+      await this.assertTelegramCanBeLinked(user.userId)
+    }
 
     const existingIdentity = await this.prisma.identity.findUnique({
       where: {
@@ -567,10 +660,17 @@ export class AuthService {
       },
     })
 
-    if (existingIdentity && existingIdentity.userId !== user.userId) {
+    if (existingIdentity?.userId && existingIdentity.userId !== user.userId) {
       throw new ConflictException({
         code: 'IDENTITY_ALREADY_LINKED',
         message: 'This identity is already linked to another account',
+      })
+    }
+
+    if (existingIdentity?.userId === user.userId) {
+      throw new ConflictException({
+        code: 'IDENTITY_ALREADY_LINKED',
+        message: 'This identity is already linked',
       })
     }
 
@@ -709,19 +809,24 @@ export class AuthService {
     userId: string,
     rawLinkToken: string,
   ): Promise<{ id: string; expiresAt: Date }> {
-    const tokenHash = this.hashToken(rawLinkToken)
+    const linkToken = await this.resolveActiveLinkTokenByRawToken(rawLinkToken)
+    if (linkToken.userId !== userId) {
+      throw new UnauthorizedException({
+        code: 'INVALID_LINK_TOKEN',
+        message: 'Link token is invalid',
+      })
+    }
 
-    const linkToken = await this.prisma.accountLinkToken.findUnique({
-      where: { tokenHash },
-      select: {
-        id: true,
-        userId: true,
-        consumedAt: true,
-        expiresAt: true,
-      },
-    })
+    return {
+      id: linkToken.id,
+      expiresAt: linkToken.expiresAt,
+    }
+  }
 
-    if (!linkToken || linkToken.userId !== userId) {
+  private async resolveActiveLinkTokenByRawToken(rawLinkToken: string): Promise<ActiveLinkToken> {
+    const linkToken = await this.resolveLinkTokenByRawToken(rawLinkToken)
+
+    if (!linkToken) {
       throw new UnauthorizedException({
         code: 'INVALID_LINK_TOKEN',
         message: 'Link token is invalid',
@@ -737,8 +842,189 @@ export class AuthService {
 
     return {
       id: linkToken.id,
+      userId: linkToken.userId,
       expiresAt: linkToken.expiresAt,
     }
+  }
+
+  private async resolveLinkTokenByRawToken(rawLinkToken: string): Promise<{
+    id: string
+    userId: string
+    consumedAt: Date | null
+    expiresAt: Date
+  } | null> {
+    const tokenHash = this.hashToken(rawLinkToken)
+    return this.prisma.accountLinkToken.findUnique({
+      where: { tokenHash },
+      select: {
+        id: true,
+        userId: true,
+        consumedAt: true,
+        expiresAt: true,
+      },
+    })
+  }
+
+  private async hasTelegramIdentity(userId: string): Promise<boolean> {
+    const identity = await this.prisma.identity.findFirst({
+      where: {
+        userId,
+        provider: IdentityProvider.TELEGRAM,
+      },
+      select: { id: true },
+    })
+
+    return Boolean(identity)
+  }
+
+  private async assertTelegramCanBeLinked(userId: string): Promise<void> {
+    const hasTelegramIdentity = await this.hasTelegramIdentity(userId)
+    if (hasTelegramIdentity) {
+      throw new ConflictException({
+        code: 'IDENTITY_ALREADY_LINKED',
+        message: 'Telegram is already linked',
+      })
+    }
+  }
+
+  private async linkTelegramIdentityInTx(
+    tx: Prisma.TransactionClient,
+    input: {
+      userId: string
+      providerUserId: string
+      metadata?: Record<string, unknown>
+    },
+  ): Promise<void> {
+    const existingIdentity = await tx.identity.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider: IdentityProvider.TELEGRAM,
+          providerUserId: input.providerUserId,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        metadata: true,
+      },
+    })
+
+    if (existingIdentity?.userId && existingIdentity.userId !== input.userId) {
+      await this.reassignTelegramIdentityToUserInTx(tx, {
+        sourceUserId: existingIdentity.userId,
+        targetUserId: input.userId,
+        identityId: existingIdentity.id,
+        existingMetadata: asJsonObject(existingIdentity.metadata),
+        incomingMetadata: input.metadata,
+      })
+      return
+    }
+
+    if (existingIdentity?.userId === input.userId) {
+      throw new ConflictException({
+        code: 'IDENTITY_ALREADY_LINKED',
+        message: 'This identity is already linked',
+      })
+    }
+
+    const existingIdentityForUser = await tx.identity.findFirst({
+      where: {
+        userId: input.userId,
+        provider: IdentityProvider.TELEGRAM,
+      },
+      select: { id: true },
+    })
+
+    if (existingIdentityForUser) {
+      throw new ConflictException({
+        code: 'IDENTITY_ALREADY_LINKED',
+        message: 'Telegram is already linked',
+      })
+    }
+
+    const createData: Prisma.IdentityCreateInput = {
+      provider: IdentityProvider.TELEGRAM,
+      providerUserId: input.providerUserId,
+      metadata: input.metadata as Prisma.InputJsonValue | undefined,
+      user: {
+        connect: { id: input.userId },
+      },
+    }
+
+    await tx.identity.create({ data: createData })
+  }
+
+  private async reassignTelegramIdentityToUserInTx(
+    tx: Prisma.TransactionClient,
+    input: {
+      sourceUserId: string
+      targetUserId: string
+      identityId: string
+      existingMetadata?: Record<string, unknown>
+      incomingMetadata?: Record<string, unknown>
+    },
+  ): Promise<void> {
+    const sourceIdentities = await tx.identity.findMany({
+      where: { userId: input.sourceUserId },
+      select: {
+        id: true,
+        provider: true,
+      },
+    })
+
+    const canReassignFromSourceUser =
+      sourceIdentities.length === 1 &&
+      sourceIdentities[0]?.id === input.identityId &&
+      sourceIdentities[0]?.provider === IdentityProvider.TELEGRAM
+
+    if (!canReassignFromSourceUser) {
+      throw new ConflictException({
+        code: 'IDENTITY_ALREADY_LINKED',
+        message: 'This identity is already linked to another account',
+      })
+    }
+
+    const targetTelegramIdentity = await tx.identity.findFirst({
+      where: {
+        userId: input.targetUserId,
+        provider: IdentityProvider.TELEGRAM,
+      },
+      select: { id: true },
+    })
+
+    if (targetTelegramIdentity) {
+      throw new ConflictException({
+        code: 'IDENTITY_ALREADY_LINKED',
+        message: 'Telegram is already linked',
+      })
+    }
+
+    const mergedMetadata = this.mergeLinkMetadata(input.existingMetadata, input.incomingMetadata)
+
+    await tx.note.updateMany({
+      where: { userId: input.sourceUserId },
+      data: { userId: input.targetUserId },
+    })
+
+    await tx.identity.update({
+      where: { id: input.identityId },
+      data: {
+        userId: input.targetUserId,
+        metadata: mergedMetadata as Prisma.InputJsonValue | undefined,
+      },
+    })
+
+    await tx.session.deleteMany({
+      where: { userId: input.sourceUserId },
+    })
+
+    await tx.accountLinkToken.deleteMany({
+      where: { userId: input.sourceUserId },
+    })
+
+    await tx.user.delete({
+      where: { id: input.sourceUserId },
+    })
   }
 
   private async assertEmailCanBeLinked(userId: string, normalizedEmail: string): Promise<void> {
@@ -880,20 +1166,6 @@ export class AuthService {
     }
   }
 
-  private verifyTelegramLinkAuthData(initDataRaw: string): TelegramUser {
-    const params = new URLSearchParams(initDataRaw)
-
-    if (params.get('user')) {
-      return this.verifyTelegramInitData(initDataRaw)
-    }
-
-    if (params.get('id')) {
-      return this.verifyTelegramLoginWidgetData(initDataRaw)
-    }
-
-    return this.verifyTelegramInitData(initDataRaw)
-  }
-
   private verifyTelegramInitData(initDataRaw: string): TelegramUser {
     if (!this.env.TELEGRAM_BOT_TOKEN) {
       throw new ServiceUnavailableException({
@@ -979,80 +1251,12 @@ export class AuthService {
 
     return telegramUser
   }
+}
 
-  private verifyTelegramLoginWidgetData(initDataRaw: string): TelegramUser {
-    if (!this.env.TELEGRAM_BOT_TOKEN) {
-      throw new ServiceUnavailableException({
-        code: 'TELEGRAM_AUTH_DISABLED',
-        message: 'Telegram auth is not configured',
-      })
-    }
-
-    const params = new URLSearchParams(initDataRaw)
-    const providedHash = params.get('hash')
-
-    if (!providedHash || !/^[a-f0-9]{64}$/i.test(providedHash)) {
-      throw new UnauthorizedException({
-        code: 'INVALID_TELEGRAM_INIT_DATA',
-        message: 'Telegram auth hash is missing or invalid',
-      })
-    }
-
-    const authDateRaw = params.get('auth_date')
-    const authDate = authDateRaw ? Number.parseInt(authDateRaw, 10) : Number.NaN
-
-    if (!Number.isInteger(authDate) || authDate <= 0) {
-      throw new UnauthorizedException({
-        code: 'INVALID_TELEGRAM_INIT_DATA',
-        message: 'Telegram auth_date is invalid',
-      })
-    }
-
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    if (nowSeconds - authDate > this.env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS) {
-      throw new UnauthorizedException({
-        code: 'TELEGRAM_INIT_DATA_EXPIRED',
-        message: 'Telegram auth data is expired',
-      })
-    }
-
-    const dataCheckString = [...params.entries()]
-      .filter(([key]) => key !== 'hash')
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, value]) => `${key}=${value}`)
-      .join('\n')
-
-    const secretKey = createHash('sha256').update(this.env.TELEGRAM_BOT_TOKEN).digest()
-    const expectedHash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex')
-
-    const expectedHashBuffer = Buffer.from(expectedHash, 'hex')
-    const providedHashBuffer = Buffer.from(providedHash, 'hex')
-
-    if (
-      expectedHashBuffer.length !== providedHashBuffer.length ||
-      !timingSafeEqual(expectedHashBuffer, providedHashBuffer)
-    ) {
-      throw new UnauthorizedException({
-        code: 'INVALID_TELEGRAM_SIGNATURE',
-        message: 'Telegram auth signature is invalid',
-      })
-    }
-
-    const idRaw = params.get('id')
-    const id = idRaw ? Number.parseInt(idRaw, 10) : Number.NaN
-
-    if (!Number.isInteger(id) || id <= 0) {
-      throw new UnauthorizedException({
-        code: 'INVALID_TELEGRAM_INIT_DATA',
-        message: 'Telegram user id is missing',
-      })
-    }
-
-    return {
-      id,
-      username: params.get('username') ?? undefined,
-      first_name: params.get('first_name') ?? undefined,
-      last_name: params.get('last_name') ?? undefined,
-    }
+function asJsonObject(value: Prisma.JsonValue | null | undefined): Record<string, unknown> | undefined {
+  if (!value || Array.isArray(value) || typeof value !== 'object') {
+    return undefined
   }
+
+  return value as Record<string, unknown>
 }

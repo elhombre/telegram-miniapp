@@ -17,7 +17,6 @@ interface UseTelegramMiniAppResult {
 
 const DEFAULT_MAX_ATTEMPTS = 20
 const DEFAULT_INTERVAL_MS = 150
-const MINIAPP_MODE_STORAGE_KEY = 'miniapp.runtime.is_telegram'
 
 export function useTelegramMiniApp(options: UseTelegramMiniAppOptions = {}): UseTelegramMiniAppResult {
   const waitForSignedData = options.waitForSignedData ?? false
@@ -40,12 +39,7 @@ export function useTelegramMiniApp(options: UseTelegramMiniAppOptions = {}): Use
       }
 
       const context = readTelegramRuntimeContext()
-      const persistedMiniAppMode = readPersistedMiniAppMode()
-      const inMiniAppMode = context.hasMiniAppLaunchParam || persistedMiniAppMode
-
-      if (context.hasMiniAppLaunchParam) {
-        persistMiniAppMode(true)
-      }
+      const inMiniAppMode = context.hasMiniAppLaunchParam
 
       setIsInTelegram(inMiniAppMode)
 
@@ -88,33 +82,5 @@ export function useTelegramMiniApp(options: UseTelegramMiniAppOptions = {}): Use
   return {
     isInTelegram,
     initDataRaw,
-  }
-}
-
-function readPersistedMiniAppMode(): boolean {
-  if (typeof window === 'undefined') {
-    return false
-  }
-
-  try {
-    return window.sessionStorage.getItem(MINIAPP_MODE_STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function persistMiniAppMode(value: boolean): void {
-  if (typeof window === 'undefined') {
-    return
-  }
-
-  try {
-    if (value) {
-      window.sessionStorage.setItem(MINIAPP_MODE_STORAGE_KEY, '1')
-    } else {
-      window.sessionStorage.removeItem(MINIAPP_MODE_STORAGE_KEY)
-    }
-  } catch {
-    // Ignore storage errors.
   }
 }

@@ -40,10 +40,10 @@
     "subtitle": "Используйте единый профиль, связывайте провайдеры и управляйте сессиями в одном месте.",
     "openDashboard": "Открыть кабинет",
     "openLogin": "Войти",
-    "openRegister": "Создать аккаунт",
-    "inTelegram": "Вы открыли приложение в Telegram. Авторизация запускается автоматически.",
-    "bootstrapError": "Не удалось авторизоваться через Telegram. Попробуйте открыть mini app снова.",
-    "features": {
+  "openRegister": "Создать аккаунт",
+  "inTelegram": "Вы открыли приложение в Telegram. Авторизация запускается автоматически.",
+  "bootstrapError": "Не удалось авторизоваться через Telegram. Попробуйте открыть mini app снова.",
+  "features": {
       "title": "Что доступно",
       "identity": "Единый аккаунт с явной привязкой провайдеров",
       "security": "Поток подтверждения email кодом для линковки",
@@ -92,6 +92,15 @@
     "confirmCode": "Подтвердить код и привязать",
     "googleButton": "Используйте кнопку Google",
     "telegramButton": "Используйте кнопку Telegram",
+    "confirmTelegram": "Подтвердить привязку Telegram",
+    "selectedTelegram": "Выбранный Telegram аккаунт: {{user}}",
+    "telegramStartButton": "Открыть Telegram и продолжить",
+    "telegramStartHint": "Откройте чат Telegram, нажмите Start, затем кнопку бота для подтверждения.",
+    "telegramAwaiting": "Ожидание подтверждения из Telegram...",
+    "telegramOpenPrompt": "Telegram открыт. Подтвердите привязку кнопкой в чате бота.",
+    "telegramLinked": "Telegram успешно привязан.",
+    "telegramExpired": "Токен линковки Telegram истёк. Запустите заново.",
+    "telegramInvalid": "Токен линковки Telegram некорректен.",
     "telegramHint": "Если Telegram показывает \"Bot domain invalid\", выполните /setdomain в BotFather для этого домена.",
     "emailCode": "Код подтверждения",
     "emailCodePlaceholder": "6-значный код из письма",
@@ -118,5 +127,17 @@
     "noAccount": "Нужен аккаунт?",
     "passwordMismatch": "Подтверждение пароля не совпадает",
     "sessionReady": "Сессия активна"
+  },
+  "debug": {
+    "miniAppTitle": "Отладка: данные Telegram miniapp",
+    "browserLinkTitle": "Отладка: данные линковки в браузере",
+    "initDataRaw": "initDataRaw",
+    "parsedParams": "Распарсенные параметры",
+    "parsedUser": "Распарсенный пользователь",
+    "telegramStartPayload": "Telegram start payload",
+    "telegramStartUrl": "Telegram start URL",
+    "googleCredential": "Google credential (JWT)",
+    "googleClaims": "Google claims",
+    "empty": "Пока нет данных"
   }
 }

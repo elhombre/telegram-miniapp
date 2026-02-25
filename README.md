@@ -191,9 +191,14 @@ Preconditions:
 4. For Google flow:
    - `apps/backend/.env` has `GOOGLE_CLIENT_ID=<your-google-oauth-client-id>`
    - `apps/frontend/.env` has `NEXT_PUBLIC_GOOGLE_CLIENT_ID=<same-client-id>`
-5. For Telegram linking from browser:
-   - `apps/frontend/.env` has `NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME=<your_bot_public_name_without_@>` (example: if bot link is `https://t.me/MyDemoBot`, use `MyDemoBot`)
-   - in BotFather run `/setdomain` and set the exact frontend domain where linking page is opened (for ngrok, update after each new tunnel domain)
+5. For Telegram linking from browser (bot flow):
+   - `apps/frontend/.env` has `NEXT_PUBLIC_TELEGRAM_BOT_PUBLIC_NAME=<bot_username_without_@>`
+   - `apps/backend/.env` has `TELEGRAM_BOT_LINK_SECRET=<shared_secret>`
+   - `apps/bot/.env` has:
+     - `TELEGRAM_MINIAPP_URL=<miniapp_url>`
+     - `BACKEND_API_BASE_URL=http://localhost:3000/api/v1`
+     - `TELEGRAM_BOT_LINK_SECRET=<same_shared_secret_as_backend>`
+   - bot process is running (`yarn workspace bot dev`)
 
 How to get `GOOGLE_CLIENT_ID`:
 
@@ -233,7 +238,10 @@ Steps:
      - signed in with `telegram`: `email`, `google`
    - `google`: click Google button in linking section and select account (link request is sent automatically)
    - `email`: fill email, click `Send Verification Code`, then enter 6-digit code and click `Confirm Code & Link`
-   - `telegram`: click Telegram Login Widget button inside linking section
+   - `telegram`: click `Open Telegram and continue`, then press `Start` in bot chat,
+     then press bot button `Svjazat`/`Связать` to confirm linking in bot chat
+     and wait until browser shows Telegram linked confirmation
+     (the bot now uses compact start payload format `l_<linkToken>`)
 12. Open `http://localhost:3100/dashboard/notes` and verify notes flow:
    - create a text note
    - verify it appears in list with created date/time
@@ -458,9 +466,12 @@ yarn workspace bot dev:webhook
   - Ensure webhook is deleted (`deleteWebhook`).
 - Telegram cannot open Mini App.
   - Check `TELEGRAM_MINIAPP_URL` is public HTTPS.
-- Telegram linking shows `Bot domain invalid`.
-  - Run `/setdomain` in BotFather for the same bot and set the exact frontend domain where the widget is opened.
-  - For ngrok/cloudflared temporary URLs, repeat `/setdomain` whenever the domain changes.
+- Telegram linking does not confirm in browser.
+  - In Telegram chat with bot, press `Start`, then press button `Svjazat`/`Связать`.
+  - Ensure `TELEGRAM_BOT_LINK_SECRET` is identical in `apps/backend/.env` and `apps/bot/.env`.
+  - Ensure `apps/bot/.env:BACKEND_API_BASE_URL` points to backend API prefix (example: `http://localhost:3000/api/v1`).
+  - Wait until bot shows `Telegram account linked successfully`, then wait for browser status update.
+  - Keep the browser linking page open until status changes to success.
 - Telegram auth endpoint returns signature/authorization error.
   - Ensure `apps/backend/.env:TELEGRAM_BOT_TOKEN` matches `apps/bot/.env:TELEGRAM_BOT_TOKEN`.
 - Webhook returns unauthorized.
