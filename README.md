@@ -2,6 +2,10 @@
 
 Production-first monorepo for Telegram Mini App + Web frontend + Backend API + Telegram bot.
 
+## AI-Driven Development
+
+This project was fully designed and implemented using AI-assisted development workflows, with human steering for product decisions, prioritization, and acceptance criteria.
+
 ## Stack
 
 - Monorepo: Turborepo
@@ -41,7 +45,7 @@ cd code
 yarn install
 ```
 
-2. Create env files.
+1. Create env files.
 
 ```bash
 cp .env.example .env
@@ -50,7 +54,7 @@ cp apps/frontend/.env.example apps/frontend/.env
 cp apps/bot/.env.example apps/bot/.env
 ```
 
-3. Fill required secrets.
+1. Fill required secrets.
 
 - root `.env`
   - `POSTGRES_*` values for local compose Postgres
@@ -81,13 +85,13 @@ cp apps/bot/.env.example apps/bot/.env
   - `BACKEND_API_BASE_URL`
   - `TELEGRAM_BOT_LINK_SECRET`
 
-4. Start local infrastructure services.
+1. Start local infrastructure services.
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-5. Apply database migrations.
+1. Apply database migrations.
 
 ```bash
 yarn workspace backend prisma:migrate:deploy
@@ -237,28 +241,31 @@ Steps:
 9. Confirm app redirects to `http://localhost:3100/` and session is active.
 10. Open `http://localhost:3100/dashboard` and confirm provider/session info is shown.
 11. Open `http://localhost:3100/dashboard/linking` and run account linking:
-   - linking is available only in standalone browser (disabled inside Telegram
+
+- linking is available only in standalone browser (disabled inside Telegram
      Mini App)
-   - available providers depend on current sign-in provider:
-     - signed in with `google`: `email`, `telegram`
-     - signed in with `email`: `google`, `telegram`
-     - signed in with `telegram`: `email`, `google` (mainly test/dev scenario
+- available providers depend on current sign-in provider:
+  - signed in with `google`: `email`, `telegram`
+  - signed in with `email`: `google`, `telegram`
+  - signed in with `telegram`: `email`, `google` (mainly test/dev scenario
        for standalone web)
-   - `google`: click Google button in linking section and select account, then
+- `google`: click Google button in linking section and select account, then
      click `Confirm and link Google` to submit linking
-   - `email`: fill email, click `Send Verification Code`, then enter 6-digit
+- `email`: fill email, click `Send Verification Code`, then enter 6-digit
      code and click `Confirm Code & Link`
-   - `telegram`: click `Open Telegram and continue`, then press `Start` in bot
+- `telegram`: click `Open Telegram and continue`, then press `Start` in bot
      chat, then press the confirmation button shown by the bot (label is
      localized automatically) and wait until browser shows Telegram linked
      confirmation (the bot now uses compact start payload format
      `l_<linkToken>`)
-   - when Telegram is linked, Profile card shows `Unlink Telegram` action
+- when Telegram is linked, Profile card shows `Unlink Telegram` action
      (available only in standalone web)
+
 12. Open `http://localhost:3100/dashboard/notes` and verify notes flow:
-   - create a text note
-   - verify it appears in list with created date/time
-   - delete the note and verify it disappears from the list
+
+- create a text note
+- verify it appears in list with created date/time
+- delete the note and verify it disappears from the list
 
 Notes:
 
@@ -302,7 +309,7 @@ Expected:
 - first attempts return `401`
 - then responses switch to `429` when `email_login_ip_email` limit is exceeded
 
-2. Verify Redis key exists:
+1. Verify Redis key exists:
 
 ```bash
 redis-cli -u "$REDIS_URL" --scan --pattern "rl:email_login_ip_email:*:ratetest@example.com"
