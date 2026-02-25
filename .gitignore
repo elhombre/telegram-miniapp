@@ -4,4 +4,6 @@ build
 dist
 !.gitignore
 !.yarnrc.yml
+!.github
+!.github/**
 !**/.env.example

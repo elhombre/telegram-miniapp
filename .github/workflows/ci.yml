@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Lint, Types, Build, E2E
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: |
+            yarn.lock
+            **/package.json
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Check types (frontend)
+        run: yarn workspace frontend check-types
+
+      - name: Check types (bot)
+        run: yarn workspace bot check-types
+
+      - name: Build backend
+        run: yarn workspace backend build
+
+      - name: Build frontend
+        run: yarn workspace frontend build
+
+      - name: Run backend e2e tests
+        run: yarn workspace backend test:e2e
