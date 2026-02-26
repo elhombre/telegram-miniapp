@@ -47,8 +47,10 @@ services:
     restart: unless-stopped
     env_file:
       - ./apps/backend/.env
+    environment:
+      PORT: ${BACKEND_PORT:-3000}
     ports:
-      - "3000:3000"
+      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
     command:
       - sh
       - -c
@@ -63,10 +65,11 @@ services:
     env_file:
       - ./apps/bot/.env
     environment:
-      BACKEND_API_BASE_URL: http://backend:3000/api/v1
+      BACKEND_HOST: backend
+      BACKEND_PORT: ${BACKEND_PORT:-3000}
       TELEGRAM_WEBHOOK_PORT: ${BOT_WEBHOOK_PORT:-3200}
     ports:
-      - "${BOT_WEBHOOK_PORT:-3200}:3200"
+      - "${BOT_WEBHOOK_PORT:-3200}:${BOT_WEBHOOK_PORT:-3200}"
 
 volumes:
   postgres_data:

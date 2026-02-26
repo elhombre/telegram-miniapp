@@ -59,6 +59,7 @@ cp apps/bot/.env.example apps/bot/.env
   - `POSTGRES_*` values for local compose Postgres
   - `REDIS_PORT`
   - `REDIS_PASSWORD` (password for local compose Redis)
+  - `BACKEND_PORT` (optional, default `3000`; must match `apps/backend/.env:PORT`)
   - `BOT_WEBHOOK_PORT` (optional, default `3200`)
 - `apps/backend/.env`
   - `DATABASE_URL` (single source of truth for backend Postgres connection)
@@ -85,7 +86,8 @@ cp apps/bot/.env.example apps/bot/.env
 - `apps/bot/.env`
   - `TELEGRAM_BOT_TOKEN`
   - `TELEGRAM_MINIAPP_URL`
-  - `BACKEND_API_BASE_URL`
+  - `BACKEND_PORT` (must match `apps/backend/.env:PORT`)
+  - `BACKEND_HOST` (`localhost` for local run; docker compose sets `backend`)
   - `TELEGRAM_BOT_LINK_SECRET`
 
 1. Start local infrastructure services.
@@ -149,6 +151,7 @@ For Docker run, set `apps/backend/.env:DATABASE_URL` to docker network host
 If you use Redis rate limiting in Docker, set `apps/backend/.env:REDIS_URL`
 to docker network host `redis`, for example:
 `redis://:redis@redis:6379/0`.
+Keep root `.env:BACKEND_PORT` and `apps/backend/.env:PORT` in sync.
 
 1. Tail logs.
 
@@ -238,7 +241,8 @@ Preconditions:
    - `apps/backend/.env` has `TELEGRAM_BOT_LINK_SECRET=<shared_secret>`
    - `apps/bot/.env` has:
      - `TELEGRAM_MINIAPP_URL=<miniapp_url>`
-     - `BACKEND_API_BASE_URL=http://localhost:3000/api/v1`
+     - `BACKEND_PORT=3000`
+     - `BACKEND_HOST=localhost`
      - `TELEGRAM_BOT_LINK_SECRET=<same_shared_secret_as_backend>`
    - bot process is running (`yarn workspace bot dev`)
 
@@ -553,7 +557,8 @@ yarn workspace bot dev:webhook
   - In Telegram chat with bot, press `Start`, then press the confirmation
     button shown by the bot (label is localized automatically).
   - Ensure `TELEGRAM_BOT_LINK_SECRET` is identical in `apps/backend/.env` and `apps/bot/.env`.
-  - Ensure `apps/bot/.env:BACKEND_API_BASE_URL` points to backend API prefix (example: `http://localhost:3000/api/v1`).
+  - Ensure `apps/bot/.env:BACKEND_PORT` matches `apps/backend/.env:PORT`.
+  - Ensure `apps/bot/.env:BACKEND_HOST` is reachable from bot runtime.
   - If bot shows `Link failed: Bot backend linking integration is not configured`,
     check both vars above and restart bot process.
   - Wait until bot shows `Telegram account linked successfully`, then wait for browser status update.

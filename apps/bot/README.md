@@ -21,7 +21,8 @@ Copy `.env.example` to `.env` and set at least:
 
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_MINIAPP_URL`
-- `BACKEND_API_BASE_URL` (for link confirmation callback)
+- `BACKEND_PORT` (must match backend `PORT`)
+- `BACKEND_HOST` (`localhost` for local run, `backend` for docker compose)
 - `TELEGRAM_BOT_LINK_SECRET` (must match backend `TELEGRAM_BOT_LINK_SECRET`)
 
 Link confirmation button label is localized automatically:

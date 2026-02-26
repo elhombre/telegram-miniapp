@@ -257,14 +257,15 @@ async function confirmTelegramLinkViaBackend(
     language_code?: string
   },
 ): Promise<{ success: true } | { success: false; message: string }> {
-  if (!env.BACKEND_API_BASE_URL || !env.TELEGRAM_BOT_LINK_SECRET) {
+  if (!env.TELEGRAM_BOT_LINK_SECRET) {
     return {
       success: false,
       message: 'Bot backend linking integration is not configured',
     }
   }
 
-  const endpoint = `${env.BACKEND_API_BASE_URL.replace(/\/+$/, '')}/auth/link/telegram/bot-confirm`
+  const endpoint = new URL(`/api/v1/auth/link/telegram/bot-confirm`, `http://${env.BACKEND_HOST}:${env.BACKEND_PORT}`)
+    .toString()
 
   try {
     const response = await fetch(endpoint, {

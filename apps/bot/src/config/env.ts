@@ -13,7 +13,8 @@ export interface BotEnv {
   TELEGRAM_WEBHOOK_SECRET?: string
   TELEGRAM_WEBHOOK_PORT: number
   TELEGRAM_MINIAPP_SHORT_NAME?: string
-  BACKEND_API_BASE_URL?: string
+  BACKEND_HOST: string
+  BACKEND_PORT: number
   TELEGRAM_BOT_LINK_SECRET?: string
 }
 
@@ -25,6 +26,8 @@ export function getBotEnv(rawEnv: NodeJS.ProcessEnv = process.env): BotEnv {
   }
 
   const errors: string[] = []
+  const backendHost = parseBackendHost(rawEnv.BACKEND_HOST, errors)
+  const backendPort = parseBackendPort(rawEnv.BACKEND_PORT, errors)
 
   const env: BotEnv = {
     NODE_ENV: parseEnum(rawEnv.NODE_ENV, 'NODE_ENV', ['development', 'test', 'production'], 'development', errors),
@@ -48,9 +51,12 @@ export function getBotEnv(rawEnv: NodeJS.ProcessEnv = process.env): BotEnv {
     TELEGRAM_WEBHOOK_SECRET: parseOptionalString(rawEnv.TELEGRAM_WEBHOOK_SECRET),
     TELEGRAM_WEBHOOK_PORT: parsePort(rawEnv.TELEGRAM_WEBHOOK_PORT, errors),
     TELEGRAM_MINIAPP_SHORT_NAME: parseOptionalString(rawEnv.TELEGRAM_MINIAPP_SHORT_NAME),
-    BACKEND_API_BASE_URL: parseOptionalUrl(rawEnv.BACKEND_API_BASE_URL, 'BACKEND_API_BASE_URL', errors),
+    BACKEND_HOST: backendHost,
+    BACKEND_PORT: backendPort,
     TELEGRAM_BOT_LINK_SECRET: parseOptionalString(rawEnv.TELEGRAM_BOT_LINK_SECRET),
   }
+
+  validateBackendConnectionTarget(backendHost, backendPort, errors)
 
   if (env.BOT_MODE === 'webhook') {
     if (!env.TELEGRAM_WEBHOOK_BASE_URL) {
@@ -180,6 +186,49 @@ function parsePort(rawValue: string | undefined, errors: string[]): number {
   }
 
   return value
+}
+
+function parseBackendPort(rawValue: string | undefined, errors: string[]): number {
+  const fallback = 3000
+
+  if (!rawValue) {
+    return fallback
+  }
+
+  const value = Number.parseInt(rawValue, 10)
+  if (!Number.isInteger(value) || value < 1 || value > 65535) {
+    errors.push(`BACKEND_PORT must be an integer between 1 and 65535, got "${rawValue}"`)
+    return fallback
+  }
+
+  return value
+}
+
+function parseBackendHost(rawValue: string | undefined, errors: string[]): string {
+  const value = parseRequiredString(rawValue, 'BACKEND_HOST', errors)
+
+  if (!value) {
+    return 'localhost'
+  }
+
+  if (value.includes('://') || value.includes('/')) {
+    errors.push(`BACKEND_HOST must not include protocol or path, got "${rawValue}"`)
+    return 'localhost'
+  }
+
+  return value
+}
+
+function validateBackendConnectionTarget(
+  backendHost: string,
+  backendPort: number,
+  errors: string[],
+): void {
+  try {
+    new URL(`/api/v1`, `http://${backendHost}:${backendPort}`)
+  } catch {
+    errors.push(`BACKEND_HOST must be a valid hostname, got "${backendHost}"`)
+  }
 }
 
 function parseWebhookPath(rawValue: string | undefined, errors: string[]): string {
