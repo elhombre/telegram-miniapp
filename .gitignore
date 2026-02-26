@@ -2,8 +2,9 @@
 *.lock
 build
 dist
-!.gitignore
-!.yarnrc.yml
 !.github
 !.github/**
+!.gitignore
+!.yarnrc.yml
 !**/.env.example
+!yarn.lock
