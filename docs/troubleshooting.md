@@ -1,0 +1,23 @@
+# Troubleshooting
+
+- Bot does not receive updates in polling mode.
+  - Ensure webhook is deleted (`deleteWebhook`).
+- Telegram cannot open Mini App.
+  - Check `TELEGRAM_MINIAPP_URL` is public HTTPS.
+- Telegram linking does not confirm in browser.
+  - In Telegram chat with bot, press `Start`, then press confirmation button.
+  - Ensure `TELEGRAM_BOT_LINK_SECRET` is identical in `apps/backend/.env` and `apps/bot/.env`.
+  - Ensure `apps/bot/.env:BACKEND_PORT` matches `apps/backend/.env:PORT`.
+  - Ensure `apps/bot/.env:BACKEND_HOST` is reachable from bot runtime.
+  - If bot shows `Link failed: Bot backend linking integration is not configured`, check env and restart bot.
+- Telegram auth endpoint returns signature/authorization error.
+  - Ensure `apps/backend/.env:TELEGRAM_BOT_TOKEN` matches `apps/bot/.env:TELEGRAM_BOT_TOKEN`.
+- Webhook returns unauthorized.
+  - Check `TELEGRAM_WEBHOOK_SECRET` and header `x-telegram-bot-api-secret-token`.
+- Backend DB issues.
+  - Re-run compose + migrations and verify tables.
+- Rate limiting with Redis seems inactive.
+  - Ensure `RATE_LIMIT_ENABLED=true` and `REDIS_URL` is configured.
+  - Ensure backend startup logs include `rate_limit_store_selected` with `provider=redis`.
+  - Verify Redis keys after repeated auth attempts:
+    - `redis-cli -u "$REDIS_URL" --scan --pattern "rl:*"`
