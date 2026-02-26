@@ -52,7 +52,7 @@ services:
     command:
       - sh
       - -c
-      - yarn workspace backend prisma:migrate:deploy && yarn workspace backend start:prod
+      - ./node_modules/.bin/prisma migrate deploy --config ./apps/backend/prisma.config.ts && node apps/backend/dist-ncc/index.js
 
   bot:
     profiles: ["app"]

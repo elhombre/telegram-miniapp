@@ -6,10 +6,12 @@
     "dev": "turbo run dev",
     "lint": "biome lint .",
     "format": "biome format --write .",
-    "check-types": "turbo run check-types"
+    "check-types": "turbo run check-types",
+    "docker:prepare-yarn-linker": "sh ./scripts/docker/enable-node-modules-linker.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
+    "@vercel/ncc": "^0.38.4",
     "turbo": "^2.8.10",
     "typescript": "5.9.2"
   },

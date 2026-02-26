@@ -3753,6 +3753,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@vercel/ncc@npm:^0.38.4":
+  version: 0.38.4
+  resolution: "@vercel/ncc@npm:0.38.4"
+  dependencies:
+    node-gyp: "npm:latest"
+  bin:
+    ncc: dist/ncc/cli.js
+  checksum: 10c0/dd6f5e95c09aa2db957788dd1fc7e5dc208b5268dc19a1560f8a71c1b18d234bb8ca0990f972051efcbc8d1cc5458242168bbdca54212a605ed0b4f680d3d876
+  languageName: node
+  linkType: hard
+
 "@webassemblyjs/ast@npm:1.14.1, @webassemblyjs/ast@npm:^1.14.1":
   version: 1.14.1
   resolution: "@webassemblyjs/ast@npm:1.14.1"
@@ -4855,6 +4866,7 @@ __metadata:
   resolution: "code@workspace:."
   dependencies:
     "@biomejs/biome": "npm:2.4.4"
+    "@vercel/ncc": "npm:^0.38.4"
     turbo: "npm:^2.8.10"
     typescript: "npm:5.9.2"
   languageName: unknown
