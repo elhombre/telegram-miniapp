@@ -28,6 +28,11 @@ This project was fully designed and implemented using AI-assisted development wo
 - Phases 0-4 are implemented.
 - Current focus is Phase 5 (hardening and release readiness).
 
+## Live Demo
+
+You can view an existing deployed bot and launch the Mini App in Telegram via [![Telegram](https://img.shields.io/badge/Telegram-Bot-blue?logo=telegram)](https://t.me/MiniAppStarterBot).
+You can also open the [web version](https://telegram-miniapp-frontend-xi.vercel.app).
+
 ## Prerequisites
 
 - Node.js 20+
@@ -297,7 +302,7 @@ Steps:
 - when Telegram is linked, Profile card shows `Unlink Telegram` action
      (available only in standalone web)
 
-12. Open `http://localhost:3100/dashboard/notes` and verify notes flow:
+1. Open `http://localhost:3100/dashboard/notes` and verify notes flow:
 
 - create a text note
 - verify it appears in list with created date/time
