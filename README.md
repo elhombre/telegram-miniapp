@@ -20,7 +20,6 @@ This project was fully designed and implemented using AI-assisted development wo
 - `apps/frontend`: web and mini app frontend
 - `apps/backend`: API and auth core
 - `apps/bot`: Telegram bot runtime
-- `packages/ui`: shared UI package
 - `packages/typescript-config`: shared TS configs
 - `docker-compose.yml`: local infra/app services via profiles (`infra`, `app`)
 
