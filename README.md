@@ -62,6 +62,9 @@ cp apps/bot/.env.example apps/bot/.env
   - `BACKEND_PORT` (optional, default `3000`)
   - `BOT_WEBHOOK_PORT` (optional, default `3200`)
 - `apps/backend/.env`
+  - `DATABASE_URL` (single source of truth for backend Postgres connection)
+    - local example: `postgresql://telegram:telegram@localhost:5432/telegram_miniapp?schema=public`
+    - production SSL example: `...&sslmode=require`
   - `JWT_ACCESS_SECRET`
   - `JWT_REFRESH_SECRET`
   - `TELEGRAM_BOT_TOKEN` (must match `apps/bot/.env`)

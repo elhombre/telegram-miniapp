@@ -46,7 +46,7 @@ export function getEnv(rawEnv: NodeJS.ProcessEnv = process.env): AppEnv {
     API_PREFIX: parseApiPrefix(rawEnv.API_PREFIX, errors),
     FRONTEND_ORIGIN: parseOptionalUrl(rawEnv.FRONTEND_ORIGIN, 'FRONTEND_ORIGIN', errors),
     LOG_LEVEL: parseEnum(rawEnv.LOG_LEVEL, 'LOG_LEVEL', ['debug', 'info', 'warn', 'error'], 'info', errors),
-    DATABASE_URL: parseRequiredString(rawEnv.DATABASE_URL, 'DATABASE_URL', errors),
+    DATABASE_URL: parseRequiredDatabaseUrl(rawEnv.DATABASE_URL, 'DATABASE_URL', errors),
     JWT_ACCESS_SECRET: parseRequiredString(rawEnv.JWT_ACCESS_SECRET, 'JWT_ACCESS_SECRET', errors),
     JWT_REFRESH_SECRET: parseRequiredString(rawEnv.JWT_REFRESH_SECRET, 'JWT_REFRESH_SECRET', errors),
     ACCESS_TOKEN_TTL_SECONDS: parsePositiveInt(
@@ -223,6 +223,26 @@ function parseRequiredString(rawValue: string | undefined, variableName: string,
   }
 
   return value
+}
+
+function parseRequiredDatabaseUrl(rawValue: string | undefined, variableName: string, errors: string[]): string {
+  const value = parseRequiredString(rawValue, variableName, errors)
+  if (!value) {
+    return ''
+  }
+
+  try {
+    const parsed = new URL(value)
+    if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
+      errors.push(`${variableName} must use postgres:// or postgresql:// protocol, got "${rawValue}"`)
+      return ''
+    }
+
+    return value
+  } catch {
+    errors.push(`${variableName} must be a valid postgres URL, got "${rawValue}"`)
+    return ''
+  }
 }
 
 function parseOptionalString(rawValue: string | undefined): string | undefined {
