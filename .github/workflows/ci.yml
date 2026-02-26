@@ -22,31 +22,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
-          cache-dependency-path: |
-            yarn.lock
-            **/package.json
 
       - name: Enable Corepack
-        run: corepack enable
+        run: |
+          corepack enable
+          corepack prepare yarn@4.9.4 --activate
+          corepack yarn --version
 
       - name: Install dependencies
-        run: yarn install --immutable
+        run: corepack yarn install --immutable
 
       - name: Lint
-        run: yarn lint
+        run: corepack yarn lint
 
       - name: Check types (frontend)
-        run: yarn workspace frontend check-types
+        run: corepack yarn workspace frontend check-types
 
       - name: Check types (bot)
-        run: yarn workspace bot check-types
+        run: corepack yarn workspace bot check-types
 
       - name: Build backend
-        run: yarn workspace backend build
+        run: corepack yarn workspace backend build
 
       - name: Build frontend
-        run: yarn workspace frontend build
+        run: corepack yarn workspace frontend build
 
       - name: Run backend e2e tests
-        run: yarn workspace backend test:e2e
+        run: corepack yarn workspace backend test:e2e
