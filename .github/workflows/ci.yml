@@ -13,6 +13,9 @@ jobs:
   validate:
     name: Lint, Types, Build, E2E
     runs-on: ubuntu-latest
+    env:
+      YARN_NODE_LINKER: node-modules
+      YARN_ENABLE_GLOBAL_CACHE: false
 
     steps:
       - name: Checkout
@@ -21,12 +24,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Enable Corepack
         run: |
           corepack enable
           corepack prepare yarn@4.9.4 --activate
+          node --version
           corepack yarn --version
 
       - name: Install dependencies
