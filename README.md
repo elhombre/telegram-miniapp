@@ -59,7 +59,6 @@ cp apps/bot/.env.example apps/bot/.env
   - `POSTGRES_*` values for local compose Postgres
   - `REDIS_PORT`
   - `REDIS_PASSWORD` (password for local compose Redis)
-  - `BACKEND_PORT` (optional, default `3000`)
   - `BOT_WEBHOOK_PORT` (optional, default `3200`)
 - `apps/backend/.env`
   - `DATABASE_URL` (single source of truth for backend Postgres connection)
@@ -143,6 +142,13 @@ docker compose --profile infra up -d postgres redis
 ```bash
 docker compose --profile app up -d --build backend bot
 ```
+
+For Docker run, set `apps/backend/.env:DATABASE_URL` to docker network host
+`postgres` (not `localhost`), for example:
+`postgresql://telegram:telegram@postgres:5432/telegram_miniapp?schema=public`.
+If you use Redis rate limiting in Docker, set `apps/backend/.env:REDIS_URL`
+to docker network host `redis`, for example:
+`redis://:redis@redis:6379/0`.
 
 1. Tail logs.
 

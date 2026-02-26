@@ -47,13 +47,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./apps/backend/.env
-      - ./.env
-    environment:
-      PORT: ${BACKEND_PORT:-3000}
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis}@redis:6379/0
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "3000:3000"
     command:
       - sh
       - -c

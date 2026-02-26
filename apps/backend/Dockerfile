@@ -5,7 +5,6 @@ WORKDIR /app
 RUN corepack enable
 
 COPY package.json yarn.lock .yarnrc.yml turbo.json biome.json ./
-COPY .yarn ./.yarn
 COPY packages ./packages
 COPY apps ./apps
 
