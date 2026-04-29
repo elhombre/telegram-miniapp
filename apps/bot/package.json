@@ -14,13 +14,13 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "dotenv": "^17.2.3",
-    "grammy": "^1.38.4"
+    "dotenv": "^17.4.2",
+    "grammy": "^1.42.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "^22.15.3",
+    "@types/node": "^25.6.0",
     "tsx": "^4.20.6",
-    "typescript": "5.9.2"
+    "typescript": "6.0.3"
   }
 }
