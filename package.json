@@ -10,10 +10,10 @@
     "docker:prepare-yarn-linker": "sh ./scripts/docker/enable-node-modules-linker.sh"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.4",
+    "@biomejs/biome": "2.4.15",
     "@vercel/ncc": "^0.38.4",
-    "turbo": "^2.8.10",
-    "typescript": "5.9.2"
+    "turbo": "^2.9.14",
+    "typescript": "6.0.3"
   },
   "engines": {
     "node": ">=18"
